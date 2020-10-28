@@ -51,7 +51,7 @@ def preprocess_net():
         for index, row in eventuser_train.iterrows():
             user = row["user_id"]
             item = row["event_id"]
-            net.write(str(user) + " " + str(item) + " " + str(1) + "\n")
+            net.write(str(user) + " " + str(item) + "\n")
 
     with open(os.path.join(data_path, "field.txt"), "w") as field:
         for user in user_set:
