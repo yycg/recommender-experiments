@@ -13,7 +13,7 @@ def preprocess_net():
     eventuser = pd.read_sql_query(sql, engine)
     eventuser = eventuser.loc[eventuser["user_type"] == "participant"]
 
-    sql = "select * from event"
+    sql = "select id, category from event"
     event = pd.read_sql_query(sql, engine)
     event = event.loc[:, ["id", "category"]]
 
@@ -41,14 +41,14 @@ def preprocess_net():
                 test_user_set.add(user)
                 test_cand_set.add(maps[i]["item"])
 
-    eventuser_train = eventuser.iloc[train_index]
-    eventuser_test = eventuser.iloc[test_index]
+    eventuser_train = eventuser.loc[train_index]
+    eventuser_test = eventuser.loc[test_index]
 
     with open(os.path.join(data_path, "net.txt"), "w") as net:
         for index, row in eventuser_train.iterrows():
             user = row["user_id"]
             item = row["event_id"]
-            net.write(user + " " + item + " " + str(1) + "\n")
+            net.write(str(user) + " " + str(item) + " " + str(1) + "\n")
 
     with open(os.path.join(data_path, "field.txt"), "w") as field:
         for user in user_set:
@@ -60,13 +60,13 @@ def preprocess_net():
         for index, row in event.iterrows():
             item = row["id"]
             category = row["category"]
-            file.write(item + " " + category + "\n")
+            file.write(str(item) + " " + category + "\n")
 
     with open(os.path.join(data_path, "user-event-rsvp_test.tsv"), "w") as test:
         for index, row in eventuser_test.iterrows():
             user = row["user_id"]
             item = row["event_id"]
-            test.write(user + "\t" + item + "\n")
+            test.write(str(user) + "\t" + str(item) + "\n")
 
 
 if __name__ == "__main__":
