@@ -7,6 +7,7 @@ data_path = "../data/douban"
 test_ratio = 0.25
 
 def preprocess_net():
+    print("Fetch data")
     engine = create_engine(
         "mysql+pymysql://douban_readonly:douban_readonly@10.112.207.78:3306/douban_beijing_2018?charset=utf8")
     sql = "select * from eventuser"
@@ -17,6 +18,7 @@ def preprocess_net():
     event = pd.read_sql_query(sql, engine)
     event = event.loc[:, ["id", "category"]]
 
+    print("Preprocess data")
     user_set = set()
     item_set = set()
     user_items_map = {}
@@ -44,6 +46,7 @@ def preprocess_net():
     eventuser_train = eventuser.loc[train_index]
     eventuser_test = eventuser.loc[test_index]
 
+    print("Write data to files")
     with open(os.path.join(data_path, "net.txt"), "w") as net:
         for index, row in eventuser_train.iterrows():
             user = row["user_id"]
