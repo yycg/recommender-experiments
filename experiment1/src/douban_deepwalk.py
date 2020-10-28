@@ -163,4 +163,5 @@ def main():
   process(args)
 
 if __name__ == "__main__":
+  # --format edgelist --input ../data/douban/net.txt --output ../data/douban/douban.embeddings
   sys.exit(main())
