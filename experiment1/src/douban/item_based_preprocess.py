@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from sqlalchemy import create_engine
 
-data_path = "../data/douban"
+data_path = "../../data/douban"
 test_ratio = 0.25
 
 def preprocess_net():
@@ -34,7 +34,7 @@ def preprocess_net():
     for index, row in eventuser.iterrows():
         user = row["user_id"]
         item = row["event_id"]
-        if 5 <= user_occurrence_count_map[user] < 20 and 5 <= item_occurrence_count_map[item] < 20:
+        if 5 <= user_occurrence_count_map[user] < 20 and 5 <= item_occurrence_count_map[item] < 100:
             user_set.add(user)
             item_set.add(item)
             user_items_map.setdefault(user, [])
@@ -64,14 +64,14 @@ def preprocess_net():
         category_items_map[category].append(item)
 
     print("Write data to files")
-    with open(os.path.join(data_path, "net.txt"), "w") as net:
+    with open(os.path.join(data_path, "user_item_list.txt"), "w") as net:
         for user, maps in user_items_map.items():
             for i in range(len(maps)):
                 if i < (1 - test_ratio) * len(maps):
                     net.write(str(maps[i]["item"]) + " ")
             net.write("\n")
 
-    with open(os.path.join(data_path, "category-item.txt"), "w") as file:
+    with open(os.path.join(data_path, "category_item_list.txt"), "w") as file:
         for category, items in category_items_map.items():
             file.write(category + " " + " ".join([str(item) for item in items]) + "\n")
 
