@@ -1,7 +1,6 @@
 import os
 import pandas as pd
 from sqlalchemy import create_engine
-from gensim.models import KeyedVectors
 
 data_path = "../data/douban"
 test_ratio = 0.25

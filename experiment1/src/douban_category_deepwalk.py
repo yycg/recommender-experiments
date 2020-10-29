@@ -68,6 +68,8 @@ def process(args):
 
   print("Data size (walks*length): {}".format(data_size))
 
+  category_graph = graph.load_adjacencylist(args.category-input, undirected=args.undirected)
+
   if data_size < args.max_memory_data_size:
     print("Walking...")
     walks = graph.build_deepwalk_corpus(G, num_paths=args.number_walks,
@@ -150,6 +152,9 @@ def main():
 
   parser.add_argument('--workers', default=1, type=int,
                       help='Number of parallel processes.')
+
+  parser.add_argument('--category-input', nargs='?', required=True,
+                      help='Category input graph file')
 
 
   args = parser.parse_args()
