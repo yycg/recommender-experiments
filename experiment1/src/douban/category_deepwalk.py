@@ -6,7 +6,7 @@ import random
 
 # https://github.com/phanein/deepwalk/issues/29
 from deepwalk import graph
-from gensim.models import Word2Vec
+from gensim.models import Category2Vec
 
 
 data_path = "../../data/douban"
@@ -34,10 +34,10 @@ def process():
                                                     path_length=walk_length, alpha=0, rand=random.Random(seed))
 
     print("Training...")
-    model = Word2Vec(walks, size=representation_size, window=window_size, min_count=0, sg=1, hs=1,
-                     workers=workers)
-
-    model.wv.save_word2vec_format(output)
+    # model = Word2Vec(walks, size=representation_size, window=window_size, min_count=0, sg=1, hs=1,
+    #                  workers=workers)
+    #
+    # model.wv.save_word2vec_format(output)
 
 
 def load_category_edgelist(file_, undirected=True):
