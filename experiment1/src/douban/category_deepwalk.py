@@ -20,7 +20,7 @@ number_walks = 10
 walk_length = 40
 representation_size = 64
 window_size = 5
-workers = 1
+workers = 5
 seed = 0
 
 
