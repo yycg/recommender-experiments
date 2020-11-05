@@ -60,8 +60,9 @@ def preprocess_net():
     for index, row in event.iterrows():
         item = row["id"]
         category = row["category"]
-        category_items_map.setdefault(category, [])
-        category_items_map[category].append(item)
+        if item in item_set:
+            category_items_map.setdefault(category, [])
+            category_items_map[category].append(item)
 
     print("Write data to files")
     with open(os.path.join(data_path, "user_item_list.txt"), "w") as net:

@@ -573,6 +573,100 @@ class BaseAny2VecModel(utils.SaveLoad):
             callback.on_train_end(self)
         return trained_word_count, raw_word_count
 
+    def train_category2vec(self, data_iterable=None, corpus_file=None, epochs=None, total_examples=None,
+              total_words=None, queue_factor=2, report_delay=1.0, callbacks=(),
+              category_documents=None, word2vec_total_examples=None, word2vec_total_words=None, **kwargs):
+        """Train the model for multiple epochs using multiple workers.
+
+        Parameters
+        ----------
+        data_iterable : iterable of list of object
+            The input corpus. This will be split in chunks and these chunks will be pushed to the queue.
+        corpus_file : str, optional
+            Path to a corpus file in :class:`~gensim.models.word2vec.LineSentence` format.
+            If you use this argument instead of `data_iterable`, you must provide `total_words` argument as well.
+        epochs : int, optional
+            Number of epochs (training iterations over the whole input) of training.
+        total_examples : int, optional
+            Count of objects in the `data_iterator`. In the usual case this would correspond to the number of sentences
+            in a corpus, used to log progress.
+        total_words : int, optional
+            Count of total objects in `data_iterator`. In the usual case this would correspond to the number of raw
+            words in a corpus, used to log progress.
+        queue_factor : int, optional
+            Multiplier for size of queue -> size = number of workers * queue_factor.
+        report_delay : float, optional
+            Number of seconds between two consecutive progress report messages in the logger.
+        callbacks : list of :class:`~gensim.models.callbacks.CallbackAny2Vec`, optional
+            List of callbacks to execute at specific stages during training.
+        **kwargs : object
+            Additional key word parameters for the specific model inheriting from this class.
+
+        Returns
+        -------
+        (int, int)
+            The total training report consisting of two elements:
+                * size of total data processed, for example number of sentences in the whole corpus.
+                * Effective word count used in training (after ignoring unknown words and trimming the sentence length).
+
+        """
+        self._set_train_params(**kwargs)
+        if callbacks:
+            self.callbacks = callbacks
+        self.epochs = epochs
+        self._check_training_sanity(
+            epochs=epochs,
+            total_examples=total_examples,
+            total_words=total_words, **kwargs)
+
+        for callback in self.callbacks:
+            callback.on_train_begin(self)
+
+        trained_word_count = 0
+        raw_word_count = 0
+        start = default_timer() - 0.00001
+        job_tally = 0
+
+        for cur_epoch in range(self.epochs):
+            for callback in self.callbacks:
+                callback.on_epoch_begin(self)
+
+            if data_iterable is not None:
+                trained_word_count_epoch, raw_word_count_epoch, job_tally_epoch = self._train_epoch(
+                    data_iterable, cur_epoch=cur_epoch, total_examples=word2vec_total_examples,
+                    total_words=word2vec_total_words, queue_factor=queue_factor, report_delay=report_delay)
+            else:
+                trained_word_count_epoch, raw_word_count_epoch, job_tally_epoch = self._train_epoch_corpusfile(
+                    corpus_file, cur_epoch=cur_epoch, total_examples=word2vec_total_examples,
+                    total_words=word2vec_total_words, **kwargs)
+
+            trained_word_count += trained_word_count_epoch
+            raw_word_count += raw_word_count_epoch
+            job_tally += job_tally_epoch
+
+            if category_documents is not None:
+                trained_word_count_epoch, raw_word_count_epoch, job_tally_epoch = self._train_epoch(
+                    category_documents, cur_epoch=cur_epoch, total_examples=total_examples,
+                    total_words=total_words, queue_factor=queue_factor, report_delay=report_delay)
+
+                trained_word_count += trained_word_count_epoch
+                raw_word_count += raw_word_count_epoch
+                job_tally += job_tally_epoch
+
+            for callback in self.callbacks:
+                callback.on_epoch_end(self)
+
+        # Log overall time
+        total_elapsed = default_timer() - start
+        self._log_train_end(raw_word_count, trained_word_count, total_elapsed, job_tally)
+
+        self.train_count += 1  # number of times train() has been called
+        self._clear_post_train()
+
+        for callback in self.callbacks:
+            callback.on_train_end(self)
+        return trained_word_count, raw_word_count
+
     @classmethod
     def load(cls, fname_or_handle, **kwargs):
         """Load a previously saved object (using :meth:`gensim.models.base_any2vec.BaseAny2VecModel.save`) from a file.
@@ -1079,6 +1173,62 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
             total_words=total_words, epochs=epochs, start_alpha=start_alpha, end_alpha=end_alpha, word_count=word_count,
             queue_factor=queue_factor, report_delay=report_delay, compute_loss=compute_loss, callbacks=callbacks,
             **kwargs)
+
+    def train_category2vec(self, sentences=None, corpus_file=None, total_examples=None, total_words=None,
+              epochs=None, start_alpha=None, end_alpha=None, word_count=0,
+              queue_factor=2, report_delay=1.0, compute_loss=False, callbacks=(),
+              category_documents=None, word2vec_total_examples=None, word2vec_total_words=None, **kwargs):
+        """Train the model. If the hyper-parameters are passed, they override the ones set in the constructor.
+        Parameters
+        ----------
+        sentences : iterable of list of str
+            Can be simply a list of lists of tokens, but for larger corpora,
+            consider an iterable that streams the sentences directly from disk/network.
+            See :class:`~gensim.models.word2vec.BrownCorpus`, :class:`~gensim.models.word2vec.Text8Corpus`
+            or :class:`~gensim.models.word2vec.LineSentence` module for such examples.
+        corpus_file : str, optional
+            Path to a corpus file in :class:`~gensim.models.word2vec.LineSentence` format.
+            You may use this argument instead of `sentences` to get performance boost. Only one of `sentences` or
+            `corpus_file` arguments need to be passed (not both of them).
+        total_examples : int, optional
+            Count of sentences.
+        total_words : int, optional
+            Count of raw words in sentences.
+        epochs : int, optional
+            Number of iterations (epochs) over the corpus.
+        start_alpha : float, optional
+            Initial learning rate.
+        end_alpha : float, optional
+            Final learning rate. Drops linearly with the number of iterations from `start_alpha`.
+        word_count : int, optional
+            Count of words already trained. Leave this to 0 for the usual case of training on all words in sentences.
+        queue_factor : int, optional
+            Multiplier for size of queue -> size = number of workers * queue_factor.
+        report_delay : float, optional
+            Seconds to wait before reporting progress.
+        compute_loss : bool, optional
+            If True, loss will be computed while training the Word2Vec model and stored in
+            :attr:`~gensim.models.base_any2vec.BaseWordEmbeddingsModel.running_training_loss`.
+        callbacks : list of :class:`~gensim.models.callbacks.CallbackAny2Vec`, optional
+            List of callbacks that need to be executed/run at specific stages during training.
+        **kwargs : object
+            Additional key word parameters for the specific model inheriting from this class.
+        Returns
+        -------
+        (int, int)
+            Tuple of (effective word count after ignoring unknown words and sentence length trimming, total word count).
+        """
+
+        self.alpha = start_alpha or self.alpha
+        self.min_alpha = end_alpha or self.min_alpha
+        self.compute_loss = compute_loss
+        self.running_training_loss = 0.0
+        return super(BaseWordEmbeddingsModel, self).train_category2vec(
+            data_iterable=sentences, corpus_file=corpus_file, total_examples=total_examples,
+            total_words=total_words, epochs=epochs, start_alpha=start_alpha, end_alpha=end_alpha, word_count=word_count,
+            queue_factor=queue_factor, report_delay=report_delay, compute_loss=compute_loss, callbacks=callbacks,
+            category_documents=category_documents, word2vec_total_examples=word2vec_total_examples,
+            word2vec_total_words=word2vec_total_words, **kwargs)
 
     def _get_job_params(self, cur_epoch):
         """Get the learning rate used in the current epoch.

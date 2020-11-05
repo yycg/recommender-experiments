@@ -72,10 +72,15 @@ except ImportError:
 
 from collections import namedtuple, defaultdict
 from timeit import default_timer
+from copy import deepcopy
 
 from numpy import zeros, float32 as REAL, empty, ones, \
     memmap as np_memmap, vstack, integer, dtype, sum as np_sum, add as np_add, repeat as np_repeat, concatenate
 
+from numpy import exp, dot, zeros, random, dtype, float32 as REAL,\
+    uint32, seterr, array, uint8, vstack, fromstring, sqrt,\
+    empty, sum as np_sum, ones, logaddexp, log, outer
+from scipy.special import expit
 
 from gensim.utils import call_on_class_only
 from gensim import utils, matutils  # utility fnc for pickling, common scipy operations etc
@@ -97,6 +102,219 @@ logger = logging.getLogger(__name__)
 # except ImportError:
 # failed... fall back to plain numpy (20-80x slower training than the above)
 FAST_VERSION = -1
+
+def train_word2vec_sg_pair(model, word, context_index, alpha, learn_vectors=True, learn_hidden=True,
+                  context_vectors=None, context_locks=None, compute_loss=False, is_ft=False):
+    """Train the passed model instance on a word and its context, using the Skip-gram algorithm.
+
+    Parameters
+    ----------
+    model : :class:`~gensim.models.word2vec.Word2Vec`
+        The model to be trained.
+    word : str
+        The label (predicted) word.
+    context_index : list of int
+        The vocabulary indices of the words in the context.
+    alpha : float
+        Learning rate.
+    learn_vectors : bool, optional
+        Whether the vectors should be updated.
+    learn_hidden : bool, optional
+        Whether the weights of the hidden layer should be updated.
+    context_vectors : list of list of float, optional
+        Vector representations of the words in the context. If None, these will be retrieved from the model.
+    context_locks : list of float, optional
+        The lock factors for each word in the context.
+    compute_loss : bool, optional
+        Whether or not the training loss should be computed.
+    is_ft : bool, optional
+        If True, weights will be computed using `model.wv.syn0_vocab` and `model.wv.syn0_ngrams`
+        instead of `model.wv.syn0`.
+
+    Returns
+    -------
+    numpy.ndarray
+        Error vector to be back-propagated.
+
+    """
+    if context_vectors is None:
+        if is_ft:
+            context_vectors_vocab = model.wordvecs.syn0_vocab
+            context_vectors_ngrams = model.wordvecs.syn0_ngrams
+        else:
+            context_vectors = model.wordvecs.syn0
+    if context_locks is None:
+        if is_ft:
+            # context_locks_vocab = model.syn0_vocab_lockf
+            # context_locks_ngrams = model.syn0_ngrams_lockf
+            context_locks_vocab = model.word2vec_trainables.syn0_vocab_lockf
+            context_locks_ngrams = model.word2vec_trainables.syn0_ngrams_lockf
+        else:
+            # context_locks = model.syn0_lockf
+            context_locks = model.word2vec_trainables.vectors_lockf
+
+    if word not in model.wordvecs.vocab:
+        return
+    predict_word = model.wordvecs.vocab[word]  # target word (NN output)
+
+    if is_ft:
+        l1_vocab = context_vectors_vocab[context_index[0]]
+        l1_ngrams = np_sum(context_vectors_ngrams[context_index[1:]], axis=0)
+        if context_index:
+            l1 = np_sum([l1_vocab, l1_ngrams], axis=0) / len(context_index)
+    else:
+        l1 = context_vectors[context_index]  # input word (NN input/projection layer)
+        lock_factor = context_locks[context_index]
+
+    neu1e = zeros(l1.shape)
+
+    if model.hs:
+        # work on the entire tree at once, to push as much work into numpy's C routines as possible (performance)
+        # l2a = deepcopy(model.syn1[predict_word.point])  # 2d matrix, codelen x layer1_size
+        l2a = deepcopy(model.word2vec_trainables.syn1[predict_word.point])  # 2d matrix, codelen x layer1_size
+        prod_term = dot(l1, l2a.T)
+        fa = expit(prod_term)  # propagate hidden -> output
+        ga = (1 - predict_word.code - fa) * alpha  # vector of error gradients multiplied by the learning rate
+        if learn_hidden:
+            # model.syn1[predict_word.point] += outer(ga, l1)  # learn hidden -> output
+            model.word2vec_trainables.syn1[predict_word.point] += outer(ga, l1)  # learn hidden -> output
+        neu1e += dot(ga, l2a)  # save error
+
+        # loss component corresponding to hierarchical softmax
+        if compute_loss:
+            sgn = (-1.0) ** predict_word.code  # `ch` function, 0 -> 1, 1 -> -1
+            lprob = -log(expit(-sgn * prod_term))
+            model.running_training_loss += sum(lprob)
+
+    if model.negative:
+        # use this word (label = 1) + `negative` other random words not from this sentence (label = 0)
+        word_indices = [predict_word.index]
+        while len(word_indices) < model.negative + 1:
+            # w = model.cum_table.searchsorted(model.random.randint(model.cum_table[-1]))
+            w = model.word2vec_vocabulary.cum_table.searchsorted(model.random.randint(model.word2vec_vocabulary.cum_table[-1]))
+            if w != predict_word.index:
+                word_indices.append(w)
+        l2b = model.word2vec_trainables.syn1neg[word_indices]  # 2d matrix, k+1 x layer1_size
+        prod_term = dot(l1, l2b.T)
+        fb = expit(prod_term)  # propagate hidden -> output
+        gb = (model.neg_labels - fb) * alpha  # vector of error gradients multiplied by the learning rate
+        if learn_hidden:
+            # model.syn1neg[word_indices] += outer(gb, l1)  # learn hidden -> output
+            model.word2vec_trainables.syn1neg[word_indices] += outer(gb, l1)  # learn hidden -> output
+        neu1e += dot(gb, l2b)  # save error
+
+        # loss component corresponding to negative sampling
+        if compute_loss:
+            model.running_training_loss -= sum(log(expit(-1 * prod_term[1:])))  # for the sampled words
+            model.running_training_loss -= log(expit(prod_term[0]))  # for the output word
+
+    if learn_vectors:
+        if is_ft:
+            model.wordvecs.syn0_vocab[context_index[0]] += neu1e * context_locks_vocab[context_index[0]]
+            for i in context_index[1:]:
+                model.wordvecs.syn0_ngrams[i] += neu1e * context_locks_ngrams[i]
+        else:
+            l1 += neu1e * lock_factor  # learn input -> hidden (mutates model.wv.syn0[word2.index], if that is l1)
+    return neu1e
+
+def train_word2vec_batch_sg(model, sentences, alpha, work=None, compute_loss=False):
+    """Update skip-gram model by training on a sequence of sentences.
+
+    Called internally from :meth:`~gensim.models.word2vec.Word2Vec.train`.
+
+    Warnings
+    --------
+    This is the non-optimized, pure Python version. If you have a C compiler, Gensim
+    will use an optimized code path from :mod:`gensim.models.word2vec_inner` instead.
+
+    Parameters
+    ----------
+    model : :class:`~gensim.models.word2Vec.Word2Vec`
+        The Word2Vec model instance to train.
+    sentences : iterable of list of str
+        The corpus used to train the model.
+    alpha : float
+        The learning rate
+    work : object, optional
+        Unused.
+    compute_loss : bool, optional
+        Whether or not the training loss should be computed in this batch.
+
+    Returns
+    -------
+    int
+        Number of words in the vocabulary actually used for training (that already existed in the vocabulary
+        and were not discarded by negative sampling).
+
+    """
+    result = 0
+    for sentence in sentences:
+        word_vocabs = [model.wordvecs.vocab[w] for w in sentence if w in model.wordvecs.vocab
+                       and model.wordvecs.vocab[w].sample_int > model.random.rand() * 2 ** 32]
+        for pos, word in enumerate(word_vocabs):
+            reduced_window = model.random.randint(model.window)  # `b` in the original word2vec code
+
+            # now go over all words from the (reduced) window, predicting each one in turn
+            start = max(0, pos - model.window + reduced_window)
+            for pos2, word2 in enumerate(word_vocabs[start:(pos + model.window + 1 - reduced_window)], start):
+                # don't train on the `word` itself
+                if pos2 != pos:
+                    train_word2vec_sg_pair(
+                        model, model.wordvecs.index2word[word.index], word2.index, alpha, compute_loss=compute_loss
+                    )
+
+        result += len(word_vocabs)
+    return result
+
+def train_word2vec_batch_cbow(model, sentences, alpha, work=None, neu1=None, compute_loss=False):
+    """Update CBOW model by training on a sequence of sentences.
+
+    Called internally from :meth:`~gensim.models.word2vec.Word2Vec.train`.
+
+    Warnings
+    --------
+    This is the non-optimized, pure Python version. If you have a C compiler, Gensim
+    will use an optimized code path from :mod:`gensim.models.word2vec_inner` instead.
+
+    Parameters
+    ----------
+    model : :class:`~gensim.models.word2vec.Word2Vec`
+        The Word2Vec model instance to train.
+    sentences : iterable of list of str
+        The corpus used to train the model.
+    alpha : float
+        The learning rate
+    work : object, optional
+        Unused.
+    neu1 : object, optional
+        Unused.
+    compute_loss : bool, optional
+        Whether or not the training loss should be computed in this batch.
+
+    Returns
+    -------
+    int
+        Number of words in the vocabulary actually used for training (that already existed in the vocabulary
+        and were not discarded by negative sampling).
+
+    """
+    result = 0
+    for sentence in sentences:
+        word_vocabs = [
+            model.wordvecs.vocab[w] for w in sentence if w in model.wordvecs.vocab
+            and model.wordvecs.vocab[w].sample_int > model.random.rand() * 2 ** 32
+        ]
+        for pos, word in enumerate(word_vocabs):
+            reduced_window = model.random.randint(model.window)  # `b` in the original word2vec code
+            start = max(0, pos - model.window + reduced_window)
+            window_pos = enumerate(word_vocabs[start:(pos + model.window + 1 - reduced_window)], start)
+            word2_indices = [word2.index for pos2, word2 in window_pos if (word2 is not None and pos2 != pos)]
+            l1 = np_sum(model.wordvecs.syn0[word2_indices], axis=0)  # 1 x vector_size
+            if word2_indices and model.cbow_mean:
+                l1 /= len(word2_indices)
+            train_cbow_pair(model, word, word2_indices, l1, alpha, compute_loss=compute_loss)
+        result += len(word_vocabs)
+    return result
 
 def train_document_dbow(model, doc_words, doctag_indexes, alpha, work=None,
                         train_words=False, learn_doctags=True, learn_words=True, learn_hidden=True,
@@ -475,7 +693,7 @@ class Category2Vec(BaseWordEmbeddingsModel):
     """
     def __init__(self, documents=None, corpus_file=None, dm_mean=None, dm=1, dbow_words=0, dm_concat=0,
                  dm_tag_count=1, docvecs=None, docvecs_mapfile=None, comment=None, trim_rule=None, callbacks=(),
-                 **kwargs):
+                 category_documents=None, **kwargs):
         """
 
         Parameters
@@ -600,6 +818,7 @@ class Category2Vec(BaseWordEmbeddingsModel):
         vocabulary_keys = ['max_vocab_size', 'min_count', 'sample', 'sorted_vocab', 'null_word', 'ns_exponent']
         vocabulary_kwargs = dict((k, kwargs[k]) for k in vocabulary_keys if k in kwargs)
         self.vocabulary = Doc2VecVocab(**vocabulary_kwargs)
+        self.word2vec_vocabulary = Word2VecVocab(**vocabulary_kwargs)
 
         trainables_keys = ['seed', 'hashfxn', 'window']
         trainables_kwargs = dict((k, kwargs[k]) for k in trainables_keys if k in kwargs)
@@ -607,8 +826,16 @@ class Category2Vec(BaseWordEmbeddingsModel):
             dm=dm, dm_concat=dm_concat, dm_tag_count=dm_tag_count,
             vector_size=self.vector_size, **trainables_kwargs)
 
+        trainables_keys = ['seed', 'hashfxn']
+        trainables_kwargs = dict((k, kwargs[k]) for k in trainables_keys if k in kwargs)
+        self.word2vec_trainables = Word2VecTrainables(vector_size=self.vector_size, **trainables_kwargs)
+
         self.wv = Word2VecKeyedVectors(self.vector_size)
         self.docvecs = docvecs or Doc2VecKeyedVectors(self.vector_size, docvecs_mapfile)
+        self.wordvecs = Word2VecKeyedVectors(self.vector_size)
+
+        self.word2vec_corpus_count = 0
+        self.word2vec_corpus_total_words = 0
 
         self.comment = comment
 
@@ -618,11 +845,14 @@ class Category2Vec(BaseWordEmbeddingsModel):
                 raise TypeError("You must pass string as the corpus_file argument.")
             elif isinstance(documents, GeneratorType):
                 raise TypeError("You can't pass a generator as the documents argument. Try a sequence.")
-            self.build_vocab(documents=documents, corpus_file=corpus_file, trim_rule=trim_rule)
+            self.build_vocab(documents=documents, corpus_file=corpus_file, trim_rule=trim_rule,
+                             category_documents=category_documents)
             self.train(
                 documents=documents, corpus_file=corpus_file, total_examples=self.corpus_count,
                 total_words=self.corpus_total_words, epochs=self.epochs, start_alpha=self.alpha,
-                end_alpha=self.min_alpha, callbacks=callbacks)
+                end_alpha=self.min_alpha, callbacks=callbacks, category_documents=category_documents,
+                word2vec_total_examples=self.word2vec_corpus_count,
+                word2vec_total_words=self.word2vec_corpus_total_words)
 
     @property
     def dm(self):
@@ -715,32 +945,45 @@ class Category2Vec(BaseWordEmbeddingsModel):
              2-tuple (effective word count after ignoring unknown words and sentence length trimming, total word count).
 
         """
+        if isinstance(job, list) and len(job) > 0 and isinstance(job[0], TaggedDocument):
+            # Doc2Vec
+            work, neu1 = inits
+            tally = 0
+            for doc in job:
+                doctag_indexes = self.vocabulary.indexed_doctags(doc.tags, self.docvecs)
+                doctag_vectors = self.docvecs.vectors_docs
+                doctag_locks = self.trainables.vectors_docs_lockf
+                if self.sg:
+                    tally += train_document_dbow(
+                        self, doc.words, doctag_indexes, alpha, work, train_words=self.dbow_words,
+                        doctag_vectors=doctag_vectors, doctag_locks=doctag_locks
+                    )
+                elif self.dm_concat:
+                    tally += train_document_dm_concat(
+                        self, doc.words, doctag_indexes, alpha, work, neu1,
+                        doctag_vectors=doctag_vectors, doctag_locks=doctag_locks
+                    )
+                else:
+                    tally += train_document_dm(
+                        self, doc.words, doctag_indexes, alpha, work, neu1,
+                        doctag_vectors=doctag_vectors, doctag_locks=doctag_locks
+                    )
+            return tally, self._raw_word_count(job)
+
+        # Word2Vec
+        sentences = job
         work, neu1 = inits
         tally = 0
-        for doc in job:
-            doctag_indexes = self.vocabulary.indexed_doctags(doc.tags, self.docvecs)
-            doctag_vectors = self.docvecs.vectors_docs
-            doctag_locks = self.trainables.vectors_docs_lockf
-            if self.sg:
-                tally += train_document_dbow(
-                    self, doc.words, doctag_indexes, alpha, work, train_words=self.dbow_words,
-                    doctag_vectors=doctag_vectors, doctag_locks=doctag_locks
-                )
-            elif self.dm_concat:
-                tally += train_document_dm_concat(
-                    self, doc.words, doctag_indexes, alpha, work, neu1,
-                    doctag_vectors=doctag_vectors, doctag_locks=doctag_locks
-                )
-            else:
-                tally += train_document_dm(
-                    self, doc.words, doctag_indexes, alpha, work, neu1,
-                    doctag_vectors=doctag_vectors, doctag_locks=doctag_locks
-                )
+        if self.sg:
+            tally += train_word2vec_batch_sg(self, sentences, alpha, work, self.compute_loss)
+        else:
+            tally += train_word2vec_batch_cbow(self, sentences, alpha, work, neu1, self.compute_loss)
         return tally, self._raw_word_count(job)
 
     def train(self, documents=None, corpus_file=None, total_examples=None, total_words=None,
               epochs=None, start_alpha=None, end_alpha=None,
-              word_count=0, queue_factor=2, report_delay=1.0, callbacks=()):
+              word_count=0, queue_factor=2, report_delay=1.0, callbacks=(),
+              category_documents=None, word2vec_total_examples=None, word2vec_total_words=None):
         """Update the model's neural weights.
 
         To support linear learning-rate decay from (initial) `alpha` to `min_alpha`, and accurate
@@ -800,10 +1043,12 @@ class Category2Vec(BaseWordEmbeddingsModel):
             kwargs['offsets'] = offsets
             kwargs['start_doctags'] = start_doctags
 
-        super(Category2Vec, self).train(
+        super(Category2Vec, self).train_category2vec(
             sentences=documents, corpus_file=corpus_file, total_examples=total_examples, total_words=total_words,
             epochs=epochs, start_alpha=start_alpha, end_alpha=end_alpha, word_count=word_count,
-            queue_factor=queue_factor, report_delay=report_delay, callbacks=callbacks, **kwargs)
+            queue_factor=queue_factor, report_delay=report_delay, callbacks=callbacks,
+            category_documents=category_documents, word2vec_total_examples=word2vec_total_examples,
+            word2vec_total_words=word2vec_total_words, **kwargs)
 
     @classmethod
     def _get_offsets_and_start_doctags_for_corpusfile(cls, corpus_file, workers):
@@ -863,7 +1108,9 @@ class Category2Vec(BaseWordEmbeddingsModel):
             Number of raw words in the corpus chunk.
 
         """
-        return sum(len(sentence.words) for sentence in job)
+        if isinstance(job, list) and len(job) > 0 and isinstance(job[0], TaggedDocument):
+            return sum(len(sentence.words) for sentence in job)
+        return super(Category2Vec, self)._raw_word_count(job)
 
     def estimated_lookup_memory(self):
         """Get estimated memory for tag lookup, 0 if using pure int tags.
@@ -1134,7 +1381,7 @@ class Category2Vec(BaseWordEmbeddingsModel):
         return super(Category2Vec, self).estimate_memory(vocab_size, report=report)
 
     def build_vocab(self, documents=None, corpus_file=None, update=False, progress_per=10000, keep_raw_vocab=False,
-                    trim_rule=None, **kwargs):
+                    trim_rule=None, category_documents=None, **kwargs):
         """Build vocabulary from a sequence of documents (can be a once-only generator stream).
 
         Parameters
@@ -1172,8 +1419,21 @@ class Category2Vec(BaseWordEmbeddingsModel):
             Additional key word arguments passed to the internal vocabulary construction.
 
         """
+        # Word2Vec
+        total_words, corpus_count = self.word2vec_vocabulary.scan_vocab(
+            sentences=documents, corpus_file=corpus_file, progress_per=progress_per, trim_rule=trim_rule)
+        self.word2vec_corpus_count = corpus_count
+        self.word2vec_corpus_total_words = total_words
+        report_values = self.word2vec_vocabulary.prepare_vocab(
+            self.hs, self.negative, self.wordvecs, update=update, keep_raw_vocab=keep_raw_vocab,
+            trim_rule=trim_rule, **kwargs)
+        report_values['word2vec_memory'] = self.estimate_memory(vocab_size=report_values['num_retained_words'])
+        self.word2vec_trainables.prepare_weights(self.hs, self.negative, self.wordvecs, update=update,
+                                                 vocabulary=self.word2vec_vocabulary)
+
+        # Doc2Vec
         total_words, corpus_count = self.vocabulary.scan_vocab(
-            documents=documents, corpus_file=corpus_file, docvecs=self.docvecs,
+            documents=category_documents, corpus_file=corpus_file, docvecs=self.docvecs,
             progress_per=progress_per, trim_rule=trim_rule
         )
         self.corpus_count = corpus_count
@@ -1516,26 +1776,33 @@ class TaggedLineDocument(object):
     automatically from the document line number (each document gets a unique integer tag).
 
     """
-    def __init__(self, source):
-        """
+    # def __init__(self, source):
+    #     """
+    #
+    #     Parameters
+    #     ----------
+    #     source : string or a file-like object
+    #         Path to the file on disk, or an already-open file object (must support `seek(0)`).
+    #
+    #     Examples
+    #     --------
+    #     .. sourcecode:: pycon
+    #
+    #         >>> from gensim.test.utils import datapath
+    #         >>> from gensim.models.doc2vec import TaggedLineDocument
+    #         >>>
+    #         >>> for document in TaggedLineDocument(datapath("head500.noblanks.cor")):
+    #         ...     pass
+    #
+    #     """
+    #     self.source = source
 
-        Parameters
-        ----------
-        source : string or a file-like object
-            Path to the file on disk, or an already-open file object (must support `seek(0)`).
-
-        Examples
-        --------
-        .. sourcecode:: pycon
-
-            >>> from gensim.test.utils import datapath
-            >>> from gensim.models.doc2vec import TaggedLineDocument
-            >>>
-            >>> for document in TaggedLineDocument(datapath("head500.noblanks.cor")):
-            ...     pass
-
-        """
-        self.source = source
+    def __init__(self, category_graph_map, num_paths, path_length, alpha, rand):
+        self.category_graph_map = category_graph_map
+        self.num_paths = num_paths
+        self.path_length = path_length
+        self.alpha = alpha
+        self.rand = rand
 
     def __iter__(self):
         """Iterate through the lines in the source.
@@ -1546,14 +1813,23 @@ class TaggedLineDocument(object):
             Document from `source` specified in the constructor.
 
         """
-        try:
-            # Assume it is a file-like object and try treating it as such
-            # Things that don't have seek will trigger an exception
-            self.source.seek(0)
-            for item_no, line in enumerate(self.source):
-                yield TaggedDocument(utils.to_unicode(line).split(), [item_no])
-        except AttributeError:
-            # If it didn't work like a file, use it as a string filename
-            with utils.smart_open(self.source) as fin:
-                for item_no, line in enumerate(fin):
-                    yield TaggedDocument(utils.to_unicode(line).split(), [item_no])
+        # try:
+        #     # Assume it is a file-like object and try treating it as such
+        #     # Things that don't have seek will trigger an exception
+        #     self.source.seek(0)
+        #     for item_no, line in enumerate(self.source):
+        #         yield TaggedDocument(utils.to_unicode(line).split(), [item_no])
+        # except AttributeError:
+        #     # If it didn't work like a file, use it as a string filename
+        #     with utils.smart_open(self.source) as fin:
+        #         for item_no, line in enumerate(fin):
+        #             yield TaggedDocument(utils.to_unicode(line).split(), [item_no])
+
+        for category, G in self.category_graph_map.items():
+            nodes = list(G.nodes())
+
+            for cnt in range(self.num_paths):
+                self.rand.shuffle(nodes)
+                for node in nodes:
+                    walk = G.random_walk(self.path_length, rand=self.rand, alpha=self.alpha, start=node)
+                    yield TaggedDocument(walk, [category])

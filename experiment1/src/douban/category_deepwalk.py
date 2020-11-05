@@ -3,10 +3,12 @@
 
 import os
 import random
+import pickle
 
 # https://github.com/phanein/deepwalk/issues/29
 from deepwalk import graph
-from gensim.models import Category2Vec
+from gensim.models import Word2Vec, Category2Vec
+from gensim.models.category2vec import TaggedLineDocument
 
 
 data_path = "../../data/douban"
@@ -24,13 +26,12 @@ seed = 0
 
 def process():
     G = graph.load_edgelist(input, undirected=undirected)
-
     category_graph_map = load_category_edgelist(category_input, undirected=undirected)
 
     print("Walking...")
     walks = graph.build_deepwalk_corpus(G, num_paths=number_walks,
                                         path_length=walk_length, alpha=0, rand=random.Random(seed))
-    category_walks_map = build_catagory_deepwalk_corpus(category_graph_map, number_walks=number_walks,
+    category_walks = build_category_deepwalk_corpus(category_graph_map, num_paths=number_walks,
                                                     path_length=walk_length, alpha=0, rand=random.Random(seed))
 
     print("Training...")
@@ -38,6 +39,11 @@ def process():
     #                  workers=workers)
     #
     # model.wv.save_word2vec_format(output)
+    model = Category2Vec(walks, size=representation_size, window=window_size, min_count=0, dm=0, hs=0,
+                         workers=workers, category_documents=category_walks)
+    model.wv.save_word2vec_format(os.path.join(data_path, "wv.txt"))
+    model.docvecs.save_word2vec_format(os.path.join(data_path, "docvecs.txt"))
+    model.wordvecs.save_word2vec_format(os.path.join(data_path, "wordvecs.txt"))
 
 
 def load_category_edgelist(file_, undirected=True):
@@ -59,22 +65,8 @@ def load_category_edgelist(file_, undirected=True):
     return category_graph_map
 
 
-def build_catagory_deepwalk_corpus(category_graph_map, num_paths, path_length, alpha=0, rand=random.Random(0)):
-    category_walks_map = {}
-
-    for category, G in category_graph_map.items():
-        walks = []
-
-        nodes = list(G.nodes())
-
-        for cnt in range(num_paths):
-            rand.shuffle(nodes)
-            for node in nodes:
-                walks.append(G.random_walk(path_length, rand=rand, alpha=alpha, start=node))
-
-        category_graph_map[category] = walks
-
-    return category_walks_map
+def build_category_deepwalk_corpus(category_graph_map, num_paths, path_length, alpha=0, rand=random.Random(0)):
+    return TaggedLineDocument(category_graph_map, num_paths, path_length, alpha, rand)
 
 
 if __name__ == "__main__":
