@@ -491,7 +491,8 @@ class BaseAny2VecModel(utils.SaveLoad):
         return trained_word_count, raw_word_count, job_tally
 
     def train(self, data_iterable=None, corpus_file=None, epochs=None, total_examples=None,
-              total_words=None, queue_factor=2, report_delay=1.0, callbacks=(), **kwargs):
+              total_words=None, queue_factor=2, report_delay=1.0, callbacks=(),
+              category_documents=None, word2vec_total_examples=None, word2vec_total_words=None, **kwargs):
         """Train the model for multiple epochs using multiple workers.
 
         Parameters
@@ -549,15 +550,25 @@ class BaseAny2VecModel(utils.SaveLoad):
 
             if data_iterable is not None:
                 trained_word_count_epoch, raw_word_count_epoch, job_tally_epoch = self._train_epoch(
-                    data_iterable, cur_epoch=cur_epoch, total_examples=total_examples,
-                    total_words=total_words, queue_factor=queue_factor, report_delay=report_delay)
+                    data_iterable, cur_epoch=cur_epoch, total_examples=word2vec_total_examples,
+                    total_words=word2vec_total_words, queue_factor=queue_factor, report_delay=report_delay)
             else:
                 trained_word_count_epoch, raw_word_count_epoch, job_tally_epoch = self._train_epoch_corpusfile(
-                    corpus_file, cur_epoch=cur_epoch, total_examples=total_examples, total_words=total_words, **kwargs)
+                    corpus_file, cur_epoch=cur_epoch, total_examples=word2vec_total_examples,
+                    total_words=word2vec_total_words, **kwargs)
 
             trained_word_count += trained_word_count_epoch
             raw_word_count += raw_word_count_epoch
             job_tally += job_tally_epoch
+
+            if category_documents is not None:
+                trained_word_count_epoch, raw_word_count_epoch, job_tally_epoch = self._train_epoch(
+                    category_documents, cur_epoch=cur_epoch, total_examples=total_examples,
+                    total_words=total_words, queue_factor=queue_factor, report_delay=report_delay)
+
+                trained_word_count += trained_word_count_epoch
+                raw_word_count += raw_word_count_epoch
+                job_tally += job_tally_epoch
 
             for callback in self.callbacks:
                 callback.on_epoch_end(self)
@@ -1025,7 +1036,8 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
 
     def train(self, sentences=None, corpus_file=None, total_examples=None, total_words=None,
               epochs=None, start_alpha=None, end_alpha=None, word_count=0,
-              queue_factor=2, report_delay=1.0, compute_loss=False, callbacks=(), **kwargs):
+              queue_factor=2, report_delay=1.0, compute_loss=False, callbacks=(),
+              category_documents=None, word2vec_total_examples=None, word2vec_total_words=None, **kwargs):
         """Train the model. If the hyper-parameters are passed, they override the ones set in the constructor.
 
         Parameters
@@ -1078,7 +1090,8 @@ class BaseWordEmbeddingsModel(BaseAny2VecModel):
             data_iterable=sentences, corpus_file=corpus_file, total_examples=total_examples,
             total_words=total_words, epochs=epochs, start_alpha=start_alpha, end_alpha=end_alpha, word_count=word_count,
             queue_factor=queue_factor, report_delay=report_delay, compute_loss=compute_loss, callbacks=callbacks,
-            **kwargs)
+            category_documents=category_documents, word2vec_total_examples=word2vec_total_examples,
+            word2vec_total_words=word2vec_total_words, **kwargs)
 
     def _get_job_params(self, cur_epoch):
         """Get the learning rate used in the current epoch.
