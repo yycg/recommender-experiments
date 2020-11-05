@@ -45,6 +45,7 @@ from gensim.utils import deprecated
 import warnings
 import os
 import copy
+import time
 
 
 try:
@@ -628,8 +629,12 @@ class BaseAny2VecModel(utils.SaveLoad):
         job_tally = 0
 
         for cur_epoch in range(self.epochs):
+            print("Epoch ", cur_epoch)
+
             for callback in self.callbacks:
                 callback.on_epoch_begin(self)
+
+            start_time = time.time()
 
             if data_iterable is not None:
                 trained_word_count_epoch, raw_word_count_epoch, job_tally_epoch = self._train_epoch(
@@ -644,6 +649,10 @@ class BaseAny2VecModel(utils.SaveLoad):
             raw_word_count += raw_word_count_epoch
             job_tally += job_tally_epoch
 
+            print("Word2Vec elapsed ", time.time() - start_time)
+
+            start_time = time.time()
+
             if category_documents is not None:
                 trained_word_count_epoch, raw_word_count_epoch, job_tally_epoch = self._train_epoch(
                     category_documents, cur_epoch=cur_epoch, total_examples=total_examples,
@@ -652,6 +661,8 @@ class BaseAny2VecModel(utils.SaveLoad):
                 trained_word_count += trained_word_count_epoch
                 raw_word_count += raw_word_count_epoch
                 job_tally += job_tally_epoch
+
+            print("Doc2Vec elapsed ", time.time() - start_time)
 
             for callback in self.callbacks:
                 callback.on_epoch_end(self)
