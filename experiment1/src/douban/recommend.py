@@ -19,6 +19,20 @@ def recommend():
     for item in word_vectors:
         item_vectors_map[item] = word_vectors[item] + doc_vectors[item_category_map[item]]
 
+    with open(os.path.join(data_path, "deepwalk.tsv"), "w") as recommend:
+        for user in user_set:
+            item_score_list = []
+            for cand in cand_set:
+                # score = word_vectors.similarity(user, cand) \
+                #     if user in word_vectors and cand in word_vectors else 0
+                score = sum([word_vectors.similarity(cand, item) for item in user_items_train_map[user]])
+                item_score_list.append((cand, score))
+            item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
+
+            recommend.write(user + "\t")
+            recommend.write(
+                ",".join([item_score[0] + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
+
     with open(os.path.join(data_path, "category2vec.tsv"), "w") as recommend:
         for user in user_set:
             item_score_list = []
@@ -26,7 +40,7 @@ def recommend():
                 # score = word_vectors.similarity(user, cand) \
                 #     if user in word_vectors and cand in word_vectors else 0
                 score = sum([item_vectors_map[cand].dot(item_vectors_map[item].T) for item in user_items_train_map[user]])
-                item_score_list.append((item, score))
+                item_score_list.append((cand, score))
             item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
 
             recommend.write(user + "\t")
