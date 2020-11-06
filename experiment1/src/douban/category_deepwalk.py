@@ -3,7 +3,6 @@
 
 import os
 import random
-import pickle
 
 # https://github.com/phanein/deepwalk/issues/29
 from deepwalk import graph
@@ -20,7 +19,7 @@ number_walks = 10
 walk_length = 40
 representation_size = 64
 window_size = 5
-workers = 5
+workers = 50
 seed = 0
 
 

@@ -1,9 +1,11 @@
 import os
 import pandas as pd
 from sqlalchemy import create_engine
+import pickle
 
 data_path = "../../data/douban"
 test_ratio = 0.25
+
 
 def preprocess_net():
     print("Fetch data")
@@ -81,6 +83,23 @@ def preprocess_net():
             user = row["user_id"]
             item = row["event_id"]
             test.write(str(user) + "\t" + str(item) + "\n")
+
+    pickle.dump(test_user_set, open(os.path.join(data_path, 'user_set.pkl'), 'wb'))
+    pickle.dump(test_cand_set, open(os.path.join(data_path, 'cand_set.pkl'), 'wb'))
+
+    user_items_train_map = {}
+    for index, row in eventuser_train.iterrows():
+        user = row["user_id"]
+        item = row["event_id"]
+        user_items_train_map.setdefault(user, [])
+        user_items_train_map[user].append(item)
+    pickle.dump(user_items_train_map, open(os.path.join(data_path, 'user_items_train_map.pkl'), 'wb'))
+
+    item_category_map = {}
+    for category, items in category_items_map.items():
+        for item in items:
+            item_category_map[item] = category
+    pickle.dump(item_category_map, open(os.path.join(data_path, 'item_category_map.pkl'), 'wb'))
 
 
 if __name__ == "__main__":
