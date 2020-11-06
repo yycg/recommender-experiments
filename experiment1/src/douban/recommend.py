@@ -1,8 +1,10 @@
 import os
 import pickle
 from gensim.models import KeyedVectors
+import numpy as np
 
 data_path = "../../data/douban"
+representation_size = 64
 
 
 def recommend():
@@ -17,7 +19,8 @@ def recommend():
 
     item_vectors_map = {}
     for item in word_vectors.vocab:
-        item_vectors_map[item] = word_vectors[item] + doc_vectors[item_category_map[item]]
+        item_vectors_map[item] = word_vectors[item] + doc_vectors[item_category_map[item]] \
+            if item in item_category_map else np.zeros(representation_size)
 
     with open(os.path.join(data_path, "deepwalk.tsv"), "w") as recommend:
         for user in user_set:
