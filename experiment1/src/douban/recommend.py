@@ -19,8 +19,8 @@ def recommend():
 
     item_vectors_map = {}
     for item in word_vectors.vocab:
-        item_vectors_map[item] = word_vectors[item] + doc_vectors[item_category_map[item]] \
-            if item in item_category_map else np.zeros(representation_size)
+        item_vectors_map[item] = word_vectors[item] + (doc_vectors["*dt_" + item_category_map[int(item)]]
+                                                       if int(item) in item_category_map else np.zeros(representation_size))
 
     with open(os.path.join(data_path, "deepwalk.tsv"), "w") as recommend:
         for user in user_set:
@@ -28,13 +28,14 @@ def recommend():
             for cand in cand_set:
                 # score = word_vectors.similarity(user, cand) \
                 #     if user in word_vectors and cand in word_vectors else 0
-                score = sum([word_vectors.similarity(cand, item) for item in user_items_train_map[user]])
+                score = sum([word_vectors.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
+                    if str(cand) in word_vectors else 0
                 item_score_list.append((cand, score))
             item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
 
-            recommend.write(user + "\t")
+            recommend.write(str(user) + "\t")
             recommend.write(
-                ",".join([item_score[0] + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
+                ",".join([str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
 
     with open(os.path.join(data_path, "category2vec.tsv"), "w") as recommend:
         for user in user_set:
@@ -42,13 +43,15 @@ def recommend():
             for cand in cand_set:
                 # score = word_vectors.similarity(user, cand) \
                 #     if user in word_vectors and cand in word_vectors else 0
-                score = sum([item_vectors_map[cand].dot(item_vectors_map[item].T) for item in user_items_train_map[user]])
+                score = sum([item_vectors_map[str(cand)].dot(item_vectors_map[str(item)].T)
+                             for item in user_items_train_map[user]]) if str(cand) in word_vectors else 0
                 item_score_list.append((cand, score))
             item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
 
-            recommend.write(user + "\t")
+            recommend.write(str(user) + "\t")
             recommend.write(
-                ",".join([item_score[0] + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
+                ",".join(
+                    [str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
 
 
 if __name__ == "__main__":
