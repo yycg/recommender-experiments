@@ -3,11 +3,8 @@ import pandas as pd
 from sqlalchemy import create_engine
 import pickle
 
-data_path = "../../data/douban"
-test_ratio = 0.25
 
-
-def preprocess_net():
+def preprocess_net(data_path, test_ratio):
     print("Fetch data")
     engine = create_engine(
         "mysql+pymysql://douban_readonly:douban_readonly@10.112.207.78:3306/douban_beijing_2018?charset=utf8")
@@ -102,5 +99,11 @@ def preprocess_net():
     pickle.dump(item_category_map, open(os.path.join(data_path, 'item_category_map.pkl'), 'wb'))
 
 
+def main():
+    data_path = "../../data/douban"
+    test_ratio = 0.25
+
+    preprocess_net(data_path, test_ratio)
+
 if __name__ == "__main__":
-    preprocess_net()
+    main()

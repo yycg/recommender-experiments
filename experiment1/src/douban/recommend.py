@@ -3,11 +3,8 @@ import pickle
 from gensim.models import KeyedVectors
 import numpy as np
 
-data_path = "../../data/douban"
-representation_size = 64
 
-
-def recommend():
+def recommend(data_path, representation_size):
     user_set = pickle.load(open(os.path.join(data_path, 'user_set.pkl'), 'rb'))
     cand_set = pickle.load(open(os.path.join(data_path, 'cand_set.pkl'), 'rb'))
     user_items_train_map = pickle.load(open(os.path.join(data_path, 'user_items_train_map.pkl'), 'rb'))
@@ -54,5 +51,12 @@ def recommend():
                     [str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
 
 
+def main():
+    data_path = "../../data/douban"
+    representation_size = 64
+
+    recommend(data_path, representation_size)
+
+
 if __name__ == "__main__":
-    recommend()
+    main()

@@ -10,20 +10,8 @@ from gensim.models import Word2Vec, Category2Vec
 from gensim.models.category2vec import TaggedLineDocument
 
 
-data_path = "../../data/douban"
-input = os.path.join(data_path, "user_item_edge.txt")
-category_input = os.path.join(data_path, "category_item_edge.txt")
-output = os.path.join(data_path, "item_embedding.txt")
-undirected = True
-number_walks = 10
-walk_length = 40
-representation_size = 64
-window_size = 5
-workers = 50
-seed = 0
-
-
-def process():
+def process(data_path, input, category_input, wv_output, docvecs_output, wordvecs_output, undirected, number_walks,
+            walk_length, representation_size, window_size, workers, seed):
     G = graph.load_edgelist(input, undirected=undirected)
     category_graph_map = load_category_edgelist(category_input, undirected=undirected)
 
@@ -40,9 +28,9 @@ def process():
     # model.wv.save_word2vec_format(output)
     model = Category2Vec(walks, size=representation_size, window=window_size, min_count=0, dm=0, hs=0,
                          workers=workers, category_documents=category_walks)
-    model.wv.save_word2vec_format(os.path.join(data_path, "wv.txt"))
-    model.docvecs.save_word2vec_format(os.path.join(data_path, "docvecs.txt"))
-    model.wordvecs.save_word2vec_format(os.path.join(data_path, "wordvecs.txt"))
+    model.wv.save_word2vec_format(os.path.join(data_path, wv_output))
+    model.docvecs.save_word2vec_format(os.path.join(data_path, docvecs_output))
+    model.wordvecs.save_word2vec_format(os.path.join(data_path, wordvecs_output))
 
 
 def load_category_edgelist(file_, undirected=True):
@@ -68,5 +56,24 @@ def build_category_deepwalk_corpus(category_graph_map, num_paths, path_length, a
     return TaggedLineDocument(category_graph_map, num_paths, path_length, alpha, rand)
 
 
+def main():
+    data_path = "../../data/douban"
+    input = "user_item_edge.txt"
+    category_input = "category_item_edge.txt"
+    wv_output = data_path, "wv.txt"
+    docvecs_output = "docvecs.txt"
+    wordvecs_output = "wordvecs.txt"
+    undirected = True
+    number_walks = 10
+    walk_length = 40
+    representation_size = 64
+    window_size = 5
+    workers = 50
+    seed = 0
+
+    process(data_path, input, category_input, wv_output, docvecs_output, wordvecs_output, undirected, number_walks,
+            walk_length, representation_size, window_size, workers, seed)
+
+
 if __name__ == "__main__":
-    process()
+    main()
