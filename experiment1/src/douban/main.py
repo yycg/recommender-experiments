@@ -1,7 +1,7 @@
-from .item_based_preprocess import preprocess_net
-from .build_graph import build_graph
-from .category_deepwalk import process
-from .recommend import recommend
+from item_based_preprocess import preprocess_net
+from build_graph import build_graph
+from category_deepwalk import process
+from recommend import recommend
 
 data_path = "../../data/douban"
 input = "user_item_edge.txt"
