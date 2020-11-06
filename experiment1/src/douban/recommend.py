@@ -16,7 +16,7 @@ def recommend():
     doc_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "docvecs.txt"), binary=False)
 
     item_vectors_map = {}
-    for item in word_vectors:
+    for item in word_vectors.vocab:
         item_vectors_map[item] = word_vectors[item] + doc_vectors[item_category_map[item]]
 
     with open(os.path.join(data_path, "deepwalk.tsv"), "w") as recommend:
