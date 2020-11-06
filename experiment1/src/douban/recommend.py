@@ -11,6 +11,7 @@ def recommend(data_path, representation_size):
     item_category_map = pickle.load(open(os.path.join(data_path, 'item_category_map.pkl'), 'rb'))
 
     # load word vectors file
+    wv = KeyedVectors.load_word2vec_format(os.path.join(data_path, "wv.txt"), binary=False)
     word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "wordvecs.txt"), binary=False)
     doc_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "docvecs.txt"), binary=False)
 
@@ -23,10 +24,8 @@ def recommend(data_path, representation_size):
         for user in user_set:
             item_score_list = []
             for cand in cand_set:
-                # score = word_vectors.similarity(user, cand) \
-                #     if user in word_vectors and cand in word_vectors else 0
-                score = sum([word_vectors.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
-                    if str(cand) in word_vectors else 0
+                score = sum([wv.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
+                    if str(cand) in wv else 0
                 item_score_list.append((cand, score))
             item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
 
@@ -38,8 +37,6 @@ def recommend(data_path, representation_size):
         for user in user_set:
             item_score_list = []
             for cand in cand_set:
-                # score = word_vectors.similarity(user, cand) \
-                #     if user in word_vectors and cand in word_vectors else 0
                 score = sum([item_vectors_map[str(cand)].dot(item_vectors_map[str(item)].T)
                              for item in user_items_train_map[user]]) if str(cand) in word_vectors else 0
                 item_score_list.append((cand, score))

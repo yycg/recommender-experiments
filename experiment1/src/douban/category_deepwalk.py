@@ -12,8 +12,8 @@ from gensim.models.category2vec import TaggedLineDocument
 
 def process(data_path, input, category_input, wv_output, docvecs_output, wordvecs_output, undirected, number_walks,
             walk_length, representation_size, window_size, workers, seed):
-    G = graph.load_edgelist(input, undirected=undirected)
-    category_graph_map = load_category_edgelist(category_input, undirected=undirected)
+    G = graph.load_edgelist(os.path.join(data_path, input), undirected=undirected)
+    category_graph_map = load_category_edgelist(os.path.join(data_path, category_input), undirected=undirected)
 
     print("Walking...")
     walks = graph.build_deepwalk_corpus(G, num_paths=number_walks,
@@ -22,15 +22,15 @@ def process(data_path, input, category_input, wv_output, docvecs_output, wordvec
                                                     path_length=walk_length, alpha=0, rand=random.Random(seed))
 
     print("Training...")
-    # model = Word2Vec(walks, size=representation_size, window=window_size, min_count=0, sg=1, hs=1,
-    #                  workers=workers)
-    #
-    # model.wv.save_word2vec_format(output)
-    model = Category2Vec(walks, size=representation_size, window=window_size, min_count=0, dm=0, hs=0,
-                         workers=workers, category_documents=category_walks)
+    model = Word2Vec(walks, size=representation_size, window=window_size, min_count=0, sg=1, hs=1,
+                     workers=workers)
+
     model.wv.save_word2vec_format(os.path.join(data_path, wv_output))
-    model.docvecs.save_word2vec_format(os.path.join(data_path, docvecs_output))
-    model.wordvecs.save_word2vec_format(os.path.join(data_path, wordvecs_output))
+    # model = Category2Vec(walks, size=representation_size, window=window_size, min_count=0, dm=0, hs=0,
+    #                      workers=workers, category_documents=category_walks)
+    # model.wv.save_word2vec_format(os.path.join(data_path, wv_output))
+    # model.docvecs.save_word2vec_format(os.path.join(data_path, docvecs_output))
+    # model.wordvecs.save_word2vec_format(os.path.join(data_path, wordvecs_output))
 
 
 def load_category_edgelist(file_, undirected=True):
