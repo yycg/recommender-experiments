@@ -26,11 +26,12 @@ def process(data_path, input, category_input, wv_output, docvecs_output, wordvec
                      workers=workers)
 
     model.wv.save_word2vec_format(os.path.join(data_path, wv_output))
-    # model = Category2Vec(walks, size=representation_size, window=window_size, min_count=0, dm=0, hs=0,
-    #                      workers=workers, category_documents=category_walks)
+
+    model = Category2Vec(walks, size=representation_size, window=window_size, min_count=0, dm=0, hs=0,
+                         workers=workers, category_documents=category_walks)
     # model.wv.save_word2vec_format(os.path.join(data_path, wv_output))
-    # model.docvecs.save_word2vec_format(os.path.join(data_path, docvecs_output))
-    # model.wordvecs.save_word2vec_format(os.path.join(data_path, wordvecs_output))
+    model.docvecs.save_word2vec_format(os.path.join(data_path, docvecs_output))
+    model.wordvecs.save_word2vec_format(os.path.join(data_path, wordvecs_output))
 
 
 def load_category_edgelist(file_, undirected=True):
