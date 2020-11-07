@@ -6,7 +6,7 @@ from recommend import recommend
 data_path = "../../data/douban"
 input = "user_item_edge.txt"
 category_input = "category_item_edge.txt"
-wv_output = data_path, "wv.txt"
+wv_output = "wv.txt"
 docvecs_output = "docvecs.txt"
 wordvecs_output = "wordvecs.txt"
 undirected = True
