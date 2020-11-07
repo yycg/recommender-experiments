@@ -33,7 +33,7 @@ def preprocess_net(data_path, test_ratio):
     for index, row in eventuser.iterrows():
         user = row["user_id"]
         item = row["event_id"]
-        if 5 <= user_occurrence_count_map[user] < 20 and 5 <= item_occurrence_count_map[item] < 100:
+        if 5 <= user_occurrence_count_map[user] < 20 and 5 <= item_occurrence_count_map[item] < 20:
             user_set.add(user)
             item_set.add(item)
             user_items_map.setdefault(user, [])
