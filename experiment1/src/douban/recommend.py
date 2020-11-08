@@ -4,7 +4,7 @@ from gensim.models import KeyedVectors
 import numpy as np
 
 
-def recommend(data_path, representation_size):
+def recommend(data_path, representation_size, deepwalk_recommend_list, category2vec_recommend_list):
     user_set = pickle.load(open(os.path.join(data_path, 'user_set.pkl'), 'rb'))
     cand_set = pickle.load(open(os.path.join(data_path, 'cand_set.pkl'), 'rb'))
     user_items_train_map = pickle.load(open(os.path.join(data_path, 'user_items_train_map.pkl'), 'rb'))
@@ -20,7 +20,7 @@ def recommend(data_path, representation_size):
         item_vectors_map[item] = word_vectors[item] + (doc_vectors["*dt_" + item_category_map[int(item)]]
                                                        if int(item) in item_category_map else np.zeros(representation_size))
 
-    with open(os.path.join(data_path, "deepwalk.tsv"), "w") as recommend:
+    with open(os.path.join(data_path, deepwalk_recommend_list), "w") as recommend:
         for user in user_set:
             item_score_list = []
             for cand in cand_set:
@@ -33,7 +33,7 @@ def recommend(data_path, representation_size):
             recommend.write(
                 ",".join([str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
 
-    with open(os.path.join(data_path, "category2vec.tsv"), "w") as recommend:
+    with open(os.path.join(data_path, category2vec_recommend_list), "w") as recommend:
         for user in user_set:
             item_score_list = []
             for cand in cand_set:
@@ -51,8 +51,10 @@ def recommend(data_path, representation_size):
 def main():
     data_path = "../../data/douban"
     representation_size = 64
+    deepwalk_recommend_list = "deepwalk.tsv"
+    category2vec_recommend_list = "category2vec.tsv"
 
-    recommend(data_path, representation_size)
+    recommend(data_path, representation_size, deepwalk_recommend_list, category2vec_recommend_list)
 
 
 if __name__ == "__main__":
