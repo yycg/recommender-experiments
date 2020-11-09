@@ -11,6 +11,7 @@ import os
 import math
 import json
 import heapq
+import imp
 
 from process import get_movie_name_id_dict, get_movie_id_name_dict
 from process import DoulistFile, MovieFile
@@ -19,8 +20,8 @@ from log_tool import data_process_logger as logger
 #VecFile = './models/fasttext_model_0804_09_cbow.vec'
 VecFile = './models/fasttext_model_0804_09_skipgram.vec'
 
-reload(sys)
-sys.setdefaultencoding('utf8')
+imp.reload(sys)
+# sys.setdefaultencoding('utf8')
 
 class minHeap():
     def __init__(self, k):
@@ -72,7 +73,7 @@ def topk_like(cur_movie_name, k=5, print_log=False):
     like_candidates = []
     #logger.debug('vecotrs size=%d' % (len(vectors)))
     #logger.debug('cur_movie_name %s, %s' % (cur_movie_name, type(cur_movie_name)))
-    if isinstance(cur_movie_name, unicode):
+    if isinstance(cur_movie_name, str):
         cur_movie_name = cur_movie_name.encode('utf8')
 
     if cur_movie_name not in movie_name_id_dict:
@@ -86,8 +87,8 @@ def topk_like(cur_movie_name, k=5, print_log=False):
         return []
     cur_vec = vectors[cur_movie_id]
     if print_log:
-        logger.info('[%d]%s top %d likes:' % (cur_movie_id, cur_movie_name, k))
-    for movie_id, vec in vectors.iteritems():
+        logger.info('[%d]%s top %d likes:' % (cur_movie_id, str(cur_movie_name, encoding='utf-8'), k))
+    for movie_id, vec in vectors.items():
         if movie_id == cur_movie_id:
             continue
         sim = similarity(cur_vec, vec)
@@ -96,7 +97,7 @@ def topk_like(cur_movie_name, k=5, print_log=False):
             like_candidates.append((movie_id, sim))
     if print_log:
         for t in sorted(like_candidates, reverse=True, key=lambda _:_[1])[:k]:
-            logger.info('[%d]%s %f' % (t[0], movie_id_name_dict[t[0]], t[1]))
+            logger.info('[%d]%s %f' % (t[0], str(movie_id_name_dict[t[0]], encoding='utf-8'), t[1]))
     return sorted(like_candidates, reverse=True, key=lambda _:_[1])[:k]
 
 def generate_movie_topk_like_result(out_file, movie_file=MovieFile, k=10):
@@ -119,8 +120,8 @@ def generate_movie_topk_like_result(out_file, movie_file=MovieFile, k=10):
                 continue
             movie_like = ["%s\t%f"%(movie_id_name_dict[_[0]], _[1]) for _ in movie_topk_like_tuple]
             movie_dict = {
-                    'objectId': movie_id, 
-                    'movie_url': movie_url, 
+                    'objectId': movie_id,
+                    'movie_url': movie_url,
                     'movie_like_fasttext': movie_like,
                     'movie_name': movie_name,
                     'fasttext_skipgram_vec': fasttext_skipgram_vec,
@@ -133,7 +134,8 @@ movie_id_name_dict = get_movie_id_name_dict(DoulistFile)
 vectors = load_vectors(VecFile)
 
 if __name__ == '__main__':
-    movie_names = ['小时代', '倩女幽魂', '悟空传', '美国往事', '战狼2']
+    # movie_names = ['小时代', '倩女幽魂', '悟空传', '美国往事', '战狼2']
+    movie_names = ['汉武大帝']
     for movie_name in movie_names:
-        topk_like(movie_name, print_log=True)
+        topk_like(movie_name, k=20, print_log=True)
     #generate_movie_topk_like_result('./output/leancloud_movie_fasttext.json', k=25)

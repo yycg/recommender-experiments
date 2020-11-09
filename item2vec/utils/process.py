@@ -2,8 +2,8 @@
 
 import json
 
-DoulistFile = './datas/doulist_0804_09.json'
-MovieFile = './datas/movie_0804_09.json'
+DoulistFile = '../datas/doulist_0804_09.json'
+MovieFile = '../datas/movie_0804_09.json'
 DoulistCorpusIdFile = DoulistFile.replace('json', 'movie_id')
 DoulistCorpusNameFile = DoulistFile.replace('json', 'movie_name')
 
@@ -17,17 +17,17 @@ def get_movie_name_id_dict(doulist_file=DoulistFile, min_word_freq=0):
                 if movie_name not in movie_counter:
                     movie_counter[movie_name] = 0
                 movie_counter[movie_name] += 1
-    movie_freq = filter(lambda _:_[1] >= min_word_freq, movie_counter.iteritems())
+    movie_freq = filter(lambda _:_[1] >= min_word_freq, movie_counter.items())
     movie_counter_sorted = sorted(movie_freq, key=lambda x: (-x[1], x[0]))
     movies, _ = list(zip(*movie_counter_sorted))
-    movie_name_id_dict = dict(zip(movies, xrange(len(movies))))
+    movie_name_id_dict = dict(zip(movies, range(len(movies))))
     movie_name_id_dict['<unk>'] = len(movies)
     print('movie_name_id_dict is %d from [%s]' % (len(movie_name_id_dict), doulist_file))
     return movie_name_id_dict
 
 def get_movie_id_name_dict(doulist_file=DoulistFile):
     movie_name_id_dict = get_movie_name_id_dict(doulist_file)
-    movie_id_name_dict = dict([(_[1], _[0]) for _ in movie_name_id_dict.iteritems()])
+    movie_id_name_dict = dict([(_[1], _[0]) for _ in movie_name_id_dict.items()])
     print('movie_id_name_dict is %d from [%s]' % (len(movie_id_name_dict), doulist_file))
     return movie_id_name_dict
 
@@ -40,7 +40,7 @@ def process2corpus():
             doulist_dict = json.loads(line.strip())
             doulist_movies = [_.encode('utf8') for _ in doulist_dict['movie_names']]
             doulist_movie_ids = [str(movie_name_id_dict[_]) for _ in doulist_movies]
-            fwrite.write('%s\n' % ('\t'.join(doulist_movies)))
+            fwrite.write('%s\n' % (b'\t'.join(doulist_movies)))
             fwrite_1.write('%s\n' % (' '.join(doulist_movie_ids)))
 
 def reader_creator(movie_dict, file_name=DoulistCorpusNameFile, ngram=4):
