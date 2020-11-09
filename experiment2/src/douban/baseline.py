@@ -344,7 +344,7 @@ def recommend(user_set, cand_set):
 if __name__ == "__main__":
     data_path = "../../data/douban/baseline"
     test_ratio = 0.25
-    CSE_path = "../../smore"
+    CSE_path = "../../../smore"
     sample_times = 40
     walk_steps = 5
     alpha = 0.01

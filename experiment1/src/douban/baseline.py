@@ -2,8 +2,7 @@ import os
 import pandas as pd
 from sqlalchemy import create_engine
 from gensim.models import KeyedVectors
-
-from build_graph import build_graph
+import itertools
 
 
 def preprocess_net(data_path, test_ratio):
@@ -75,6 +74,16 @@ def preprocess_net(data_path, test_ratio):
         user_items_train_map[user].append(item)
 
     return test_user_set, test_cand_set, user_items_train_map
+
+
+def build_graph(data_path):
+    with open(os.path.join(data_path, "user_item_list.txt"), "r") as reader, \
+            open(os.path.join(data_path, "user_item_edge.txt"), "w") as writer:
+        for line in reader:
+            items = line.strip().split(" ")
+            edges = itertools.permutations(items, 2)
+            for edge in edges:
+                writer.write(" ".join(edge) + "\n")
 
 
 def run_model(data_path, CSE_path, sample_times, walk_steps, alpha, item2vec_path):
@@ -340,11 +349,11 @@ def recommend(user_set, cand_set, data_path, user_items_train_map):
 def main():
     data_path = "../../data/douban/baseline"
     test_ratio = 0.25
-    CSE_path = "../../smore"
+    CSE_path = "../../../smore"
     sample_times = 40
     walk_steps = 5
     alpha = 0.01
-    item2vec_path = "../../item2vec"
+    item2vec_path = "../../../item2vec"
 
     user_set, cand_set, user_items_train_map = preprocess_net(data_path, test_ratio)
     build_graph(data_path)
