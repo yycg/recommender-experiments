@@ -77,7 +77,7 @@ def preprocess_net(data_path, test_ratio):
     return test_user_set, test_cand_set, user_items_train_map
 
 
-def run_model(data_path, CSE_path, sample_times, walk_steps, alpha):
+def run_model(data_path, CSE_path, sample_times, walk_steps, alpha, item2vec_path):
     # deepwalk
     cmd = CSE_path + "/cli/deepwalk -train " + data_path + "/net.txt -save " + data_path + \
           "rep_dw.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
@@ -145,6 +145,12 @@ def run_model(data_path, CSE_path, sample_times, walk_steps, alpha):
     cmd = CSE_path + "/cli/hoprec -train " + data_path + "/net.txt -save " + data_path + \
           "rep_hoprec.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
               format(sample_times, walk_steps, alpha)
+    print(cmd)
+    os.system(cmd)
+
+    # item2vec
+    cmd = item2vec_path + "/fasttext skipgram -input " + data_path + "/net.txt -output " + data_path + \
+          "item2vec.txt -minCount 5 -epoch 50 -neg 100"
     print(cmd)
     os.system(cmd)
 
@@ -313,6 +319,23 @@ def recommend(user_set, cand_set, data_path, user_items_train_map):
             recommend.write(
                 ",".join([str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
 
+    # item2vec
+    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "item2vec.txt"), binary=False)
+
+    with open(os.path.join(data_path, "item2vec.tsv"), "w") as recommend:
+        for user in user_set:
+            item_score_list = []
+            for cand in cand_set:
+                score = sum([word_vectors.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
+                    if str(cand) in word_vectors else 0
+                item_score_list.append((cand, score))
+            item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
+
+            recommend.write(str(user) + "\t")
+            recommend.write(
+                ",".join(
+                    [str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
+
 
 def main():
     data_path = "../../data/douban/baseline"
@@ -321,10 +344,11 @@ def main():
     sample_times = 40
     walk_steps = 5
     alpha = 0.01
+    item2vec_path = "../../item2vec"
 
     user_set, cand_set, user_items_train_map = preprocess_net(data_path, test_ratio)
     build_graph(data_path)
-    run_model(data_path, CSE_path, sample_times, walk_steps, alpha)
+    run_model(data_path, CSE_path, sample_times, walk_steps, alpha, item2vec_path)
     recommend(user_set, cand_set, data_path, user_items_train_map)
 
 
