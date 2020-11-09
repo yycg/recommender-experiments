@@ -149,7 +149,7 @@ def run_model(data_path, CSE_path, sample_times, walk_steps, alpha, item2vec_pat
     os.system(cmd)
 
     # item2vec
-    cmd = item2vec_path + "/fasttext skipgram -input " + data_path + "/net.txt -output " + data_path + \
+    cmd = item2vec_path + "/fastText-0.9.1/fasttext skipgram -input " + data_path + "/net.txt -output " + data_path + \
           "item2vec.txt -minCount 5 -epoch 50 -neg 100"
     print(cmd)
     os.system(cmd)
