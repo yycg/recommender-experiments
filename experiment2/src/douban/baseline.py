@@ -57,12 +57,6 @@ def preprocess_net(data_path, test_ratio):
         for item in item_set:
             field.write(str(item) + " i\n")
 
-    with open(os.path.join(data_path, "item-category.txt"), "w") as file:
-        for index, row in event.iterrows():
-            item = row["id"]
-            category = row["category"]
-            file.write(str(item) + " " + category + "\n")
-
     with open(os.path.join(data_path, "user-event-rsvp_test.tsv"), "w") as test:
         for index, row in eventuser_test.iterrows():
             user = row["user_id"]
