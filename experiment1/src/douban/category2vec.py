@@ -6,7 +6,7 @@ from argparse import ArgumentParser, FileType, ArgumentDefaultsHelpFormatter
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser("main",
+    parser = ArgumentParser("category2vec",
                             formatter_class=ArgumentDefaultsHelpFormatter,
                             conflict_handler='resolve')
     parser.add_argument("--data_path", default="../../data/douban")
