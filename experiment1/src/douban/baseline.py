@@ -2,7 +2,6 @@ import os
 import pandas as pd
 from sqlalchemy import create_engine
 from gensim.models import KeyedVectors
-import pickle
 
 from build_graph import build_graph
 
