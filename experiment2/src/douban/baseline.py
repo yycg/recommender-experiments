@@ -12,21 +12,28 @@ def preprocess_net(data_path, test_ratio):
     eventuser = pd.read_sql_query(sql, engine)
     eventuser = eventuser.loc[eventuser["user_type"] == "participant"]
 
-    sql = "select id, category from event"
-    event = pd.read_sql_query(sql, engine)
-    event = event.loc[:, ["id", "category"]]
-
     print("Preprocess data")
+    user_occurrence_count_map = {}
+    item_occurrence_count_map = {}
+    for index, row in eventuser.iterrows():
+        user = row["user_id"]
+        item = row["event_id"]
+        user_occurrence_count_map.setdefault(user, 0)
+        user_occurrence_count_map[user] += 1
+        item_occurrence_count_map.setdefault(item, 0)
+        item_occurrence_count_map[item] += 1
+
     user_set = set()
     item_set = set()
     user_items_map = {}
     for index, row in eventuser.iterrows():
         user = row["user_id"]
         item = row["event_id"]
-        user_set.add(user)
-        item_set.add(item)
-        user_items_map.setdefault(user, [])
-        user_items_map[user].append({"item": item, "index": index})
+        if 5 <= user_occurrence_count_map[user] < 20 and 5 <= item_occurrence_count_map[item] < 20:
+            user_set.add(user)
+            item_set.add(item)
+            user_items_map.setdefault(user, [])
+            user_items_map[user].append({"item": item, "index": index})
 
     train_index = []
     test_index = []
