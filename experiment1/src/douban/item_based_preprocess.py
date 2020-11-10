@@ -7,7 +7,7 @@ import pickle
 def preprocess_net(data_path, test_ratio):
     print("Fetch data")
     engine = create_engine(
-        "mysql+pymysql://douban_readonly:douban_readonly@10.112.207.78:3306/douban_beijing_2018?charset=utf8")
+        "mysql+pymysql://douban_readonly:douban_readonly@10.105.240.25:3306/douban_beijing_2018?charset=utf8")
     sql = "select * from eventuser"
     eventuser = pd.read_sql_query(sql, engine)
     eventuser = eventuser.loc[eventuser["user_type"] == "participant"]
