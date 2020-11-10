@@ -152,7 +152,7 @@ def run_model(data_path, CSE_path, sample_times, walk_steps, alpha, item2vec_pat
 
     # item2vec
     cmd = item2vec_path + "/fastText-0.9.1/fasttext skipgram -input " + data_path + "/user_item_list.txt -output " + \
-          data_path + "/item2vec.txt -minCount 5 -epoch 50 -neg 100"
+          data_path + "/item2vec -minCount 5 -epoch 50 -neg 100"
     print(cmd)
     os.system(cmd)
 
@@ -306,7 +306,7 @@ def recommend(user_set, cand_set, data_path, user_items_train_map):
                 ",".join([str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
 
     # item2vec
-    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "item2vec.txt"), binary=False)
+    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "item2vec.vec"), binary=False)
 
     with open(os.path.join(data_path, "item2vec.tsv"), "w") as recommend:
         for user in user_set:
