@@ -305,22 +305,6 @@ def recommend(user_set, cand_set, data_path, user_items_train_map):
             recommend.write(
                 ",".join([str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
 
-    # hoprec
-    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_hoprec.txt"), binary=False)
-
-    with open(os.path.join(data_path, "hoprec.tsv"), "w") as recommend:
-        for user in user_set:
-            item_score_list = []
-            for cand in cand_set:
-                score = sum([word_vectors.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
-                    if str(cand) in word_vectors else 0
-                item_score_list.append((cand, score))
-            item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
-
-            recommend.write(str(user) + "\t")
-            recommend.write(
-                ",".join([str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
-
     # item2vec
     word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "item2vec.txt"), binary=False)
 
