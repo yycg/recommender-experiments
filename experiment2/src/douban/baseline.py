@@ -49,7 +49,7 @@ def preprocess_net(data_path, test_ratio):
         for index, row in eventuser_train.iterrows():
             user = row["user_id"]
             item = row["event_id"]
-            net.write(str(user) + " " + str(item) + "\n")
+            net.write(str(user) + " " + str(item) + " 1\n")
 
     with open(os.path.join(data_path, "field.txt"), "w") as field:
         for user in user_set:
@@ -83,70 +83,70 @@ def run_model():
 
     # deepwalk
     cmd = CSE_path + "/cli/deepwalk -train " + data_path + "/net.txt -save " + data_path + \
-          "rep_dw.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
+          "/rep_dw.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
               format(sample_times, walk_steps, alpha)
     print(cmd)
     os.system(cmd)
 
     # walklets
     cmd = CSE_path + "/cli/walklets -train " + data_path + "/net.txt -save " + data_path + \
-          "rep_wl.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
+          "/rep_wl.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
               format(sample_times, walk_steps, alpha)
     print(cmd)
     os.system(cmd)
 
     # line order=1
     cmd = CSE_path + "/cli/line -train " + data_path + "/net.txt -save " + data_path + \
-          "rep_line1.txt -order 1 -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
+          "/rep_line1.txt -order 1 -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
               format(sample_times, walk_steps, alpha)
     print(cmd)
     os.system(cmd)
 
     # line order=2
     cmd = CSE_path + "/cli/line -train " + data_path + "/net.txt -save " + data_path + \
-          "rep_line2.txt -order 2 -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
+          "/rep_line2.txt -order 2 -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
               format(sample_times, walk_steps, alpha)
     print(cmd)
     os.system(cmd)
 
     # hpe
     cmd = CSE_path + "/cli/hpe -train " + data_path + "/net.txt -save " + data_path + \
-          "rep_hpe.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
+          "/rep_hpe.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
               format(sample_times, walk_steps, alpha)
     print(cmd)
     os.system(cmd)
 
     # app
     cmd = CSE_path + "/cli/app -train " + data_path + "/net.txt -save " + data_path + \
-          "rep_app.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
+          "/rep_app.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
               format(sample_times, walk_steps, alpha)
     print(cmd)
     os.system(cmd)
 
     # mf
     cmd = CSE_path + "/cli/mf -train " + data_path + "/net.txt -save " + data_path + \
-          "rep_mf.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
+          "/rep_mf.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
               format(sample_times, walk_steps, alpha)
     print(cmd)
     os.system(cmd)
 
     # bpr
     cmd = CSE_path + "/cli/bpr -train " + data_path + "/net.txt -save " + data_path + \
-          "rep_bpr.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
+          "/rep_bpr.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
               format(sample_times, walk_steps, alpha)
     print(cmd)
     os.system(cmd)
 
     # warp
     cmd = CSE_path + "/cli/warp -train " + data_path + "/net.txt -save " + data_path + \
-          "rep_warp.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
+          "/rep_warp.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
               format(sample_times, walk_steps, alpha)
     print(cmd)
     os.system(cmd)
 
     # hoprec
-    cmd = CSE_path + "/cli/hoprec -train " + data_path + "/net.txt -save " + data_path + \
-          "rep_hoprec.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
+    cmd = CSE_path + "/cli/hoprec -train " + data_path + "/net.txt -save " + data_path + "/rep_hoprec.txt -field " \
+         + data_path + "/field.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
               format(sample_times, walk_steps, alpha)
     print(cmd)
     os.system(cmd)
