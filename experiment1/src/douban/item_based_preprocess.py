@@ -12,11 +12,15 @@ def preprocess_net(data_path, test_ratio):
     eventuser = pd.read_sql_query(sql, engine)
     eventuser = eventuser.loc[eventuser["user_type"] == "participant"]
 
-    sql = "select id, category from event"
+    sql = "select * from event"
     event = pd.read_sql_query(sql, engine)
-    event = event.loc[:, ["id", "category"]]
 
     print("Preprocess data")
+    event_set = set()
+    for index, row in event.iterrows():
+        event = row["id"]
+        event_set.add(event)
+
     user_occurrence_count_map = {}
     item_occurrence_count_map = {}
     for index, row in eventuser.iterrows():
@@ -33,7 +37,7 @@ def preprocess_net(data_path, test_ratio):
     for index, row in eventuser.iterrows():
         user = row["user_id"]
         item = row["event_id"]
-        if 5 <= user_occurrence_count_map[user] < 20 and 5 <= item_occurrence_count_map[item] < 20:
+        if 5 <= user_occurrence_count_map[user] < 20 and 5 <= item_occurrence_count_map[item] < 20 and item in event_set:
             user_set.add(user)
             item_set.add(item)
             user_items_map.setdefault(user, [])
@@ -58,7 +62,7 @@ def preprocess_net(data_path, test_ratio):
     category_items_map = {}
     for index, row in event.iterrows():
         item = row["id"]
-        category = row["category"]
+        category = row["owner_id"]
         if item in item_set:
             category_items_map.setdefault(category, [])
             category_items_map[category].append(item)
@@ -73,7 +77,7 @@ def preprocess_net(data_path, test_ratio):
 
     with open(os.path.join(data_path, "category_item_list.txt"), "w") as file:
         for category, items in category_items_map.items():
-            file.write(category + " " + " ".join([str(item) for item in items]) + "\n")
+            file.write(str(category) + " " + " ".join([str(item) for item in items]) + "\n")
 
     with open(os.path.join(data_path, "user-event-rsvp_test.tsv"), "w") as test:
         for index, row in eventuser_test.iterrows():
