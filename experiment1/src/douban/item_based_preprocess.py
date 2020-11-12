@@ -13,11 +13,11 @@ def preprocess_net(data_path, test_ratio):
     eventuser = eventuser.loc[eventuser["user_type"] == "participant"]
 
     sql = "select * from event"
-    event = pd.read_sql_query(sql, engine)
+    event_df = pd.read_sql_query(sql, engine)
 
     print("Preprocess data")
     event_set = set()
-    for index, row in event.iterrows():
+    for index, row in event_df.iterrows():
         event = row["id"]
         event_set.add(event)
 
@@ -60,7 +60,7 @@ def preprocess_net(data_path, test_ratio):
     eventuser_test = eventuser.loc[test_index]
 
     category_items_map = {}
-    for index, row in event.iterrows():
+    for index, row in event_df.iterrows():
         item = row["id"]
         category = row["owner_id"]
         if item in item_set:

@@ -15,11 +15,11 @@ def preprocess_net(data_path, test_ratio):
     eventuser = eventuser.loc[eventuser["user_type"] == "participant"]
 
     sql = "select id from event"
-    event = pd.read_sql_query(sql, engine)
+    event_df = pd.read_sql_query(sql, engine)
 
     print("Preprocess data")
     event_set = set()
-    for index, row in event.iterrows():
+    for index, row in event_df.iterrows():
         event = row["id"]
         event_set.add(event)
 
