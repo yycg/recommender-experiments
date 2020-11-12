@@ -2,7 +2,7 @@ from item_based_preprocess import preprocess_net
 from build_graph import build_graph
 from category_deepwalk import process
 from recommend import recommend
-from argparse import ArgumentParser, FileType, ArgumentDefaultsHelpFormatter
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
 
 if __name__ == "__main__":

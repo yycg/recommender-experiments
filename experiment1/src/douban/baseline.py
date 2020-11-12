@@ -312,7 +312,8 @@ def recommend(user_set, cand_set, data_path, user_items_train_map):
         for user in user_set:
             item_score_list = []
             for cand in cand_set:
-                score = sum([word_vectors.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
+                score = sum([word_vectors.similarity(str(cand), str(item))
+                             for item in user_items_train_map[user] if str(item) in word_vectors]) \
                     if str(cand) in word_vectors else 0
                 item_score_list.append((cand, score))
             item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
