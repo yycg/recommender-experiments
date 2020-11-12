@@ -12,7 +12,15 @@ def preprocess_net(data_path, test_ratio):
     eventuser = pd.read_sql_query(sql, engine)
     eventuser = eventuser.loc[eventuser["user_type"] == "participant"]
 
+    sql = "select id from event"
+    event = pd.read_sql_query(sql, engine)
+
     print("Preprocess data")
+    event_set = set()
+    for index, row in event.iterrows():
+        event = row["id"]
+        event_set.add(event)
+
     user_occurrence_count_map = {}
     item_occurrence_count_map = {}
     for index, row in eventuser.iterrows():
@@ -29,7 +37,7 @@ def preprocess_net(data_path, test_ratio):
     for index, row in eventuser.iterrows():
         user = row["user_id"]
         item = row["event_id"]
-        if 5 <= user_occurrence_count_map[user] < 20 and 5 <= item_occurrence_count_map[item] < 20:
+        if 5 <= user_occurrence_count_map[user] < 20 and 5 <= item_occurrence_count_map[item] < 20 and item in event_set:
             user_set.add(user)
             item_set.add(item)
             user_items_map.setdefault(user, [])
@@ -233,6 +241,8 @@ def main():
     walk_steps = 5
     alpha = 0.01
 
+    if not os.path.exists(data_path):
+        os.makedirs(data_path)
     user_set, cand_set = preprocess_net(data_path, test_ratio)
     run_model(CSE_path, data_path, sample_times, walk_steps, alpha)
     recommend(user_set, cand_set, data_path)
