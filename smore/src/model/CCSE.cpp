@@ -58,7 +58,7 @@ void CCSE::Init(int dim) {
     w_contextI.resize(pnet.MAX_vid);
     w_contextUU.resize(pnet.MAX_vid);
     w_contextII.resize(pnet.MAX_vid);
-    w_contextP.resize(pnet.Max_vid);
+    w_contextP.resize(pnet.MAX_vid);
 
     for (long vid=0; vid<pnet.MAX_vid; ++vid)
     {
