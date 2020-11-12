@@ -24,6 +24,8 @@ class CCSE {
         vector< vector<double> > w_contextI;
         vector< vector<double> > w_contextUU;
         vector< vector<double> > w_contextII;
+        vector< vector<double> > w_vertexP;
+        vector< vector<double> > w_contextP;
 
         // data function
         void LoadEdgeList(string, bool);

@@ -58,6 +58,7 @@ void CCSE::Init(int dim) {
     w_contextI.resize(pnet.MAX_vid);
     w_contextUU.resize(pnet.MAX_vid);
     w_contextII.resize(pnet.MAX_vid);
+    w_contextP.resize(pnet.Max_vid);
 
     for (long vid=0; vid<pnet.MAX_vid; ++vid)
     {
@@ -72,12 +73,14 @@ void CCSE::Init(int dim) {
         w_contextI[vid].resize(dim);
         w_contextUU[vid].resize(dim);
         w_contextII[vid].resize(dim);
+        w_contextP[vid].resize(dim);
         for (int d=0; d<dim;++d)
         {
             w_contextU[vid][d] = 0.0;
             w_contextI[vid][d] = 0.0;
             w_contextUU[vid][d] = 0.0;
             w_contextII[vid][d] = 0.0;
+            w_contextP[vid][d] = 0.0;
         }
     }
 
@@ -119,15 +122,21 @@ void CCSE::Train(int sample_times, int walk_steps, double alpha, int workers){
         while (count<jobs)
         {
             vid = pnet.SourceSample();
-            while (pnet.field[vid].fields[0]!=0)
+            while (pnet.field[vid].fields[0]!=0 && pnet.field[vid].fields[0]!=2)
                 vid = pnet.SourceSample();
             cid = pnet.TargetSample(vid);
             
-            {
+            if (pnet.field[vid].fields[0] == 0) {
+                // user-item pair
                 pnet.UpdateBatchCommunity(w_vertexI, w_contextI, cid, vid, dim, 0.0, walk_steps, negative_samples, _alpha*0.05);
                 pnet.UpdateBatchCommunity(w_vertexU, w_contextU, vid, cid, dim, 0.0, walk_steps, negative_samples, _alpha*0.05);
                 //pnet.UpdateUIPair(w_vertexU, w_vertexI, w_contextU, w_contextI, vid, cid, dim, 0.025, walk_steps, negative_samples, _alpha);
                 pnet.UpdateFactorizedPair(w_vertexU, w_vertexI, vid, cid, dim, 0.025, negative_samples, _alpha);
+            } else {
+                // item_property-item pair
+                pnet.UpdateBatchCommunity(w_vertexI, w_contextI, cid, vid, dim, 0.0, walk_steps, negative_samples, _alpha*0.05);
+                pnet.UpdateBatchCommunity(w_vertexP, w_contextP, vid, cid, dim, 0.0, walk_steps, negative_samples, _alpha*0.05);
+                pnet.UpdateFactorizedPair(w_vertexP, w_vertexI, vid, cid, dim, 0.025, negative_samples, _alpha);
             }
 
             count ++;
