@@ -160,42 +160,47 @@ def run_model(data_path, CSE_path, sample_times, walk_steps, alpha, item2vec_pat
 def recommend(user_set, cand_set, data_path, user_items_train_map):
     # deepwalk
     word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_dw.txt"), binary=False)
-
-    with open(os.path.join(data_path, "deepwalk.tsv"), "w") as recommend:
-        for user in user_set:
-            item_score_list = []
-            for cand in cand_set:
-                score = sum([word_vectors.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
-                    if str(cand) in word_vectors else 0
-                item_score_list.append((cand, score))
-            item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
-
-            recommend.write(str(user) + "\t")
-            recommend.write(
-                ",".join([str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
-
+    _recommend(user_set, cand_set, word_vectors, user_items_train_map, data_path, "deepwalk.tsv")
 
     # walklets
     word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_wl.txt"), binary=False)
-
-    with open(os.path.join(data_path, "walklets.tsv"), "w") as recommend:
-        for user in user_set:
-            item_score_list = []
-            for cand in cand_set:
-                score = sum([word_vectors.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
-                    if str(cand) in word_vectors else 0
-                item_score_list.append((cand, score))
-            item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
-
-            recommend.write(str(user) + "\t")
-            recommend.write(
-                ",".join(
-                    [str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
+    _recommend(user_set, cand_set, word_vectors, user_items_train_map, data_path, "walklets.tsv")
 
     # line order=1
     word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_line1.txt"), binary=False)
+    _recommend(user_set, cand_set, word_vectors, user_items_train_map, data_path, "line1.tsv")
 
-    with open(os.path.join(data_path, "line1.tsv"), "w") as recommend:
+    # line order=2
+    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_line2.txt"), binary=False)
+    _recommend(user_set, cand_set, word_vectors, user_items_train_map, data_path, "line2.tsv")
+
+    # hpe
+    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_hpe.txt"), binary=False)
+    _recommend(user_set, cand_set, word_vectors, user_items_train_map, data_path, "hpe.tsv")
+
+    # app
+    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_app.txt"), binary=False)
+    _recommend(user_set, cand_set, word_vectors, user_items_train_map, data_path, "app.tsv")
+
+    # mf
+    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_mf.txt"), binary=False)
+    _recommend(user_set, cand_set, word_vectors, user_items_train_map, data_path, "mf.tsv")
+
+    # bpr
+    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_bpr.txt"), binary=False)
+    _recommend(user_set, cand_set, word_vectors, user_items_train_map, data_path, "bpr.tsv")
+
+    # warp
+    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_warp.txt"), binary=False)
+    _recommend(user_set, cand_set, word_vectors, user_items_train_map, data_path, "warp.tsv")
+
+    # item2vec
+    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "item2vec.vec"), binary=False)
+    _recommend_item2vec(user_set, cand_set, word_vectors, user_items_train_map, data_path)
+
+
+def _recommend(user_set, cand_set, word_vectors, user_items_train_map, data_path, recommend_file):
+    with open(os.path.join(data_path, recommend_file), "w") as recommend:
         for user in user_set:
             item_score_list = []
             for cand in cand_set:
@@ -209,105 +214,8 @@ def recommend(user_set, cand_set, data_path, user_items_train_map):
                 ",".join(
                     [str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
 
-    # line order=2
-    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_line2.txt"), binary=False)
 
-    with open(os.path.join(data_path, "line2.tsv"), "w") as recommend:
-        for user in user_set:
-            item_score_list = []
-            for cand in cand_set:
-                score = sum([word_vectors.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
-                    if str(cand) in word_vectors else 0
-                item_score_list.append((cand, score))
-            item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
-
-            recommend.write(str(user) + "\t")
-            recommend.write(
-                ",".join([str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
-
-    # hpe
-    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_hpe.txt"), binary=False)
-
-    with open(os.path.join(data_path, "hpe.tsv"), "w") as recommend:
-        for user in user_set:
-            item_score_list = []
-            for cand in cand_set:
-                score = sum([word_vectors.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
-                    if str(cand) in word_vectors else 0
-                item_score_list.append((cand, score))
-            item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
-
-            recommend.write(str(user) + "\t")
-            recommend.write(
-                ",".join([str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
-
-    # app
-    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_app.txt"), binary=False)
-
-    with open(os.path.join(data_path, "app.tsv"), "w") as recommend:
-        for user in user_set:
-            item_score_list = []
-            for cand in cand_set:
-                score = sum([word_vectors.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
-                    if str(cand) in word_vectors else 0
-                item_score_list.append((cand, score))
-            item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
-
-            recommend.write(str(user) + "\t")
-            recommend.write(
-                ",".join([str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
-
-    # mf
-    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_mf.txt"), binary=False)
-
-    with open(os.path.join(data_path, "mf.tsv"), "w") as recommend:
-        for user in user_set:
-            item_score_list = []
-            for cand in cand_set:
-                score = sum([word_vectors.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
-                    if str(cand) in word_vectors else 0
-                item_score_list.append((cand, score))
-            item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
-
-            recommend.write(str(user) + "\t")
-            recommend.write(
-                ",".join([str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
-
-    # bpr
-    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_bpr.txt"), binary=False)
-
-    with open(os.path.join(data_path, "bpr.tsv"), "w") as recommend:
-        for user in user_set:
-            item_score_list = []
-            for cand in cand_set:
-                score = sum([word_vectors.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
-                    if str(cand) in word_vectors else 0
-                item_score_list.append((cand, score))
-            item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
-
-            recommend.write(str(user) + "\t")
-            recommend.write(
-                ",".join([str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
-
-    # warp
-    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_warp.txt"), binary=False)
-
-    with open(os.path.join(data_path, "warp.tsv"), "w") as recommend:
-        for user in user_set:
-            item_score_list = []
-            for cand in cand_set:
-                score = sum([word_vectors.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
-                    if str(cand) in word_vectors else 0
-                item_score_list.append((cand, score))
-            item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
-
-            recommend.write(str(user) + "\t")
-            recommend.write(
-                ",".join([str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
-
-    # item2vec
-    word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "item2vec.vec"), binary=False)
-
+def _recommend_item2vec(user_set, cand_set, word_vectors, user_items_train_map, data_path):
     with open(os.path.join(data_path, "item2vec.tsv"), "w") as recommend:
         for user in user_set:
             item_score_list = []
