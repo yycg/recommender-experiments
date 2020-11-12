@@ -81,88 +81,82 @@ def preprocess_net(data_path, test_ratio):
     return test_user_set, test_cand_set
 
 
-def run_model(CSE_path, data_path, sample_times, walk_steps, alpha):
+def run_model(smore_path, data_path):
     # nemf
-    cmd = CSE_path + "/cli/nemf -train " + data_path + "/net.txt -save " + data_path + "/rep_nemf.txt -field " \
-          + data_path + "/field.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1" \
-              .format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/nemf -train " + data_path + "/net.txt -save " + data_path + "/rep_nemf.txt -field " \
+          + data_path + "/field.txt -dimensions 64 -sample_times 10 -alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # nerank
-    cmd = CSE_path + "/cli/nerank -train " + data_path + "/net.txt -save " + data_path + "/rep_nerank.txt -field " \
-          + data_path + "/field.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1" \
-              .format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/nerank -train " + data_path + "/net.txt -save " + data_path + "/rep_nerank.txt -field " \
+          + data_path + "/field.txt -dimensions 64 -sample_times 10 -alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # deepwalk
-    cmd = CSE_path + "/cli/deepwalk -train " + data_path + "/net.txt -save " + data_path + \
-          "/rep_dw.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/deepwalk -train " + data_path + "/net.txt -save " + data_path + \
+          "/rep_dw.txt -undirected 1 -dimensions 64 -walk_times 10 -walk_steps 40 -window_size 5 " \
+          "-negative_samples 5 -alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # walklets
-    cmd = CSE_path + "/cli/walklets -train " + data_path + "/net.txt -save " + data_path + \
-          "/rep_wl.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/walklets -train " + data_path + "/net.txt -save " + data_path + \
+          "/rep_wl.txt -undirected 1 -dimensions 64 -walk_times 10 -walk_steps 40 -window_min 2 " \
+          "-window_max 5 -negative_samples 5 -alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # line order=1
-    cmd = CSE_path + "/cli/line -train " + data_path + "/net.txt -save " + data_path + \
-          "/rep_line1.txt -order 1 -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/line -train " + data_path + "/net.txt -save " + data_path + \
+          "/rep_line1.txt -undirected 1 -order 1 -dimensions 64 -sample_times 10 -negative_samples 5 " \
+          "-alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # line order=2
-    cmd = CSE_path + "/cli/line -train " + data_path + "/net.txt -save " + data_path + \
-          "/rep_line2.txt -order 2 -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/line -train " + data_path + "/net.txt -save " + data_path + \
+          "/rep_line2.txt -undirected 1 -order 2 -dimensions 64 -sample_times 10 -negative_samples 5 " \
+          "-alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # hpe
-    cmd = CSE_path + "/cli/hpe -train " + data_path + "/net.txt -save " + data_path + \
-          "/rep_hpe.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/hpe -train " + data_path + "/net.txt -save " + data_path + \
+          "/rep_hpe.txt -undirected 1 -dimensions 64 -reg 0.01 -sample_times 5 -walk_steps 5 " \
+          "-negative_samples 5 -alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # app
-    cmd = CSE_path + "/cli/app -train " + data_path + "/net.txt -save " + data_path + \
-          "/rep_app.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/app -train " + data_path + "/net.txt -save " + data_path + \
+          "/rep_app.txt -undirected 1 -dimensions 64 -walk_times 100 -sample_times 20 -jump 0.5 " \
+          "-negative_samples 5 -alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # mf
-    cmd = CSE_path + "/cli/mf -train " + data_path + "/net.txt -save " + data_path + \
-          "/rep_mf.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/mf -train " + data_path + "/net.txt -save " + data_path + \
+          "/rep_mf.txt -dimensions 64 -sample_times 10 -negative_samples 5 -alpha 0.025 -reg 0.01 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # bpr
-    cmd = CSE_path + "/cli/bpr -train " + data_path + "/net.txt -save " + data_path + \
-          "/rep_bpr.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/bpr -train " + data_path + "/net.txt -save " + data_path + \
+          "/rep_bpr.txt -dimensions 64 -sample_times 10 -alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # warp
-    cmd = CSE_path + "/cli/warp -train " + data_path + "/net.txt -save " + data_path + \
-          "/rep_warp.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/warp -train " + data_path + "/net.txt -save " + data_path + \
+          "/rep_warp.txt -dimensions 64 -sample_times 10 -alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # hoprec
-    cmd = CSE_path + "/cli/hoprec -train " + data_path + "/net.txt -save " + data_path + "/rep_hoprec.txt -field " \
-         + data_path + "/field.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/hoprec -train " + data_path + "/net.txt -save " + data_path + "/rep_hoprec.txt -field " \
+         + data_path + "/field.txt -dimensions 64 -sample_times 10 -alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
@@ -235,16 +229,13 @@ def _recommend(user_set, cand_set, word_vectors, data_path, recommend_file):
 
 def main():
     data_path = "../../data/douban/baseline"
+    smore_path = "../../../smore"
     test_ratio = 0.25
-    CSE_path = "../../../smore"
-    sample_times = 40
-    walk_steps = 5
-    alpha = 0.01
 
     if not os.path.exists(data_path):
         os.makedirs(data_path)
     user_set, cand_set = preprocess_net(data_path, test_ratio)
-    run_model(CSE_path, data_path, sample_times, walk_steps, alpha)
+    run_model(smore_path, data_path)
     recommend(user_set, cand_set, data_path)
 
 if __name__ == "__main__":

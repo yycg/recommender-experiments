@@ -3,6 +3,7 @@ import pandas as pd
 from sqlalchemy import create_engine
 from gensim.models import KeyedVectors
 import itertools
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
 
 def preprocess_net(data_path, test_ratio):
@@ -38,7 +39,8 @@ def preprocess_net(data_path, test_ratio):
     for index, row in eventuser.iterrows():
         user = row["user_id"]
         item = row["event_id"]
-        if 5 <= user_occurrence_count_map[user] < 20 and 5 <= item_occurrence_count_map[item] < 20 and item in event_set:
+        if 5 <= user_occurrence_count_map[user] < 20 and 5 <= item_occurrence_count_map[
+            item] < 20 and item in event_set:
             user_set.add(user)
             item_set.add(item)
             user_items_map.setdefault(user, [])
@@ -94,73 +96,70 @@ def build_graph(data_path):
                 writer.write(" ".join(edge) + " 1\n")
 
 
-def run_model(data_path, CSE_path, sample_times, walk_steps, alpha, item2vec_path):
+def run_model(data_path, smore_path, item2vec_path):
     # deepwalk
-    cmd = CSE_path + "/cli/deepwalk -train " + data_path + "/user_item_edge.txt -save " + data_path + \
-          "/rep_dw.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/deepwalk -train " + data_path + "/user_item_edge.txt -save " + data_path + \
+          "/rep_dw.txt -undirected 1 -dimensions 64 -walk_times 10 -walk_steps 40 -window_size 5 " \
+          "-negative_samples 5 -alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # walklets
-    cmd = CSE_path + "/cli/walklets -train " + data_path + "/user_item_edge.txt -save " + data_path + \
-          "/rep_wl.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/walklets -train " + data_path + "/user_item_edge.txt -save " + data_path + \
+          "/rep_wl.txt -undirected 1 -dimensions 64 -walk_times 10 -walk_steps 40 -window_min 2 " \
+          "-window_max 5 -negative_samples 5 -alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # line order=1
-    cmd = CSE_path + "/cli/line -train " + data_path + "/user_item_edge.txt -save " + data_path + \
-          "/rep_line1.txt -order 1 -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/line -train " + data_path + "/user_item_edge.txt -save " + data_path + \
+          "/rep_line1.txt -undirected 1 -order 1 -dimensions 64 -sample_times 10 -negative_samples 5 " \
+          "-alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # line order=2
-    cmd = CSE_path + "/cli/line -train " + data_path + "/user_item_edge.txt -save " + data_path + \
-          "/rep_line2.txt -order 2 -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/line -train " + data_path + "/user_item_edge.txt -save " + data_path + \
+          "/rep_line2.txt -undirected 1 -order 2 -dimensions 64 -sample_times 10 -negative_samples 5 " \
+          "-alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # hpe
-    cmd = CSE_path + "/cli/hpe -train " + data_path + "/user_item_edge.txt -save " + data_path + \
-          "/rep_hpe.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/hpe -train " + data_path + "/user_item_edge.txt -save " + data_path + \
+          "/rep_hpe.txt -undirected 1 -dimensions 64 -reg 0.01 -sample_times 5 -walk_steps 5 " \
+          "-negative_samples 5 -alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # app
-    cmd = CSE_path + "/cli/app -train " + data_path + "/user_item_edge.txt -save " + data_path + \
-          "/rep_app.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/app -train " + data_path + "/user_item_edge.txt -save " + data_path + \
+          "/rep_app.txt -undirected 1 -dimensions 64 -walk_times 100 -sample_times 20 -jump 0.5 " \
+          "-negative_samples 5 -alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # mf
-    cmd = CSE_path + "/cli/mf -train " + data_path + "/user_item_edge.txt -save " + data_path + \
-          "/rep_mf.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/mf -train " + data_path + "/user_item_edge.txt -save " + data_path + \
+          "/rep_mf.txt -dimensions 64 -sample_times 10 -negative_samples 5 -alpha 0.025 -reg 0.01 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # bpr
-    cmd = CSE_path + "/cli/bpr -train " + data_path + "/user_item_edge.txt -save " + data_path + \
-          "/rep_bpr.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/bpr -train " + data_path + "/user_item_edge.txt -save " + data_path + \
+          "/rep_bpr.txt -dimensions 64 -sample_times 10 -alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # warp
-    cmd = CSE_path + "/cli/warp -train " + data_path + "/user_item_edge.txt -save " + data_path + \
-          "/rep_warp.txt -dimensions 128 -sample_times {0} -walk_steps {1} -alpha {2} -threads 1". \
-              format(sample_times, walk_steps, alpha)
+    cmd = smore_path + "/cli/warp -train " + data_path + "/user_item_edge.txt -save " + data_path + \
+          "/rep_warp.txt -dimensions 64 -sample_times 10 -alpha 0.025 -threads 1"
     print(cmd)
     os.system(cmd)
 
     # item2vec
     cmd = item2vec_path + "/fastText-0.9.1/fasttext skipgram -input " + data_path + "/user_item_list.txt -output " + \
-          data_path + "/item2vec -minCount 5 -epoch 50 -neg 100"
+          data_path + "/item2vec -minCount 0 -epoch 50 -neg 100"
     print(cmd)
     os.system(cmd)
 
@@ -242,18 +241,15 @@ def _recommend_item2vec(user_set, cand_set, word_vectors, user_items_train_map, 
 
 def main():
     data_path = "../../data/douban/baseline"
-    test_ratio = 0.25
-    CSE_path = "../../../smore"
-    sample_times = 40
-    walk_steps = 5
-    alpha = 0.01
+    smore_path = "../../../smore"
     item2vec_path = "../../../item2vec"
+    test_ratio = 0.25
 
     if not os.path.exists(data_path):
         os.makedirs(data_path)
     user_set, cand_set, user_items_train_map = preprocess_net(data_path, test_ratio)
     build_graph(data_path)
-    run_model(data_path, CSE_path, sample_times, walk_steps, alpha, item2vec_path)
+    run_model(data_path, smore_path, item2vec_path)
     recommend(user_set, cand_set, data_path, user_items_train_map)
 
 
