@@ -120,17 +120,16 @@ def recommend(user_set, cand_set, data_path, item_category_map):
         for user in user_set:
             item_score_list = []
             for item in cand_set:
-                # score = word_vectors.similarity(str(user), str(item)) \
-                #     if str(user) in word_vectors and str(item) in word_vectors else 0 + \
-                #     word_vectors.similarity(str(user), str(item_category_map[item])) \
-                #     if str(user) in word_vectors and str(item_category_map[item]) in word_vectors else 0
-                score = word_vectors.similarity(str(user), str(item)) + \
-                        word_vectors.similarity(str(user), str(item_category_map[item]))
+                score = word_vectors.similarity(str(user), str(item)) \
+                    if str(user) in word_vectors and str(item) in word_vectors else 0 + \
+                    word_vectors.similarity(str(user), str(item_category_map[item])) \
+                    if str(user) in word_vectors and str(item_category_map[item]) in word_vectors else 0
                 item_score_list.append((item, score))
             item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
 
             recommend.write(user + "\t")
-            recommend.write(",".join([item_score[0] + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
+            recommend.write(
+                ",".join([item_score[0] + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
 
 def main(args):
     test_ratio = 0.25
