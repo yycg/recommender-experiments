@@ -35,6 +35,9 @@ void CCSE::SaveWeights(string model_name){
             if (pnet.field[vid].fields[0]==1)
                 for (int d=0; d<dim; ++d)
                     model << " " << w_vertexI[vid][d];
+            if (pnet.field[vid].fields[0]==2)
+                for (int d=0; d<dim; ++d)
+                    model << " " << w_vertexP[vid][d];
 
             model << endl;
         }

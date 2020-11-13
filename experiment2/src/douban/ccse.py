@@ -68,6 +68,11 @@ def preprocess_net(data_path, test_ratio):
             category_items_map.setdefault(category, [])
             category_items_map[category].append(item)
 
+    item_category_map = {}
+    for category, items in category_items_map.items():
+        for item in items:
+            item_category_map[item] = category
+
     print("Write data to files")
     with open(os.path.join(data_path, "net.txt"), "w") as net:
         # user-item pair
@@ -94,7 +99,7 @@ def preprocess_net(data_path, test_ratio):
             item = row["event_id"]
             test.write(str(user) + "\t" + str(item) + "\n")
 
-    return test_user_set, test_cand_set
+    return test_user_set, test_cand_set, item_category_map
 
 
 def run_model(smore_path, data_path, sample_times, walk_steps, alpha, dimensions):
@@ -106,7 +111,7 @@ def run_model(smore_path, data_path, sample_times, walk_steps, alpha, dimensions
     os.system(cmd)
 
 
-def recommend(user_set, cand_set, data_path):
+def recommend(user_set, cand_set, data_path, item_category_map):
     # ccse
     # load word vectors file
     word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_ccse.txt"), binary=False)
@@ -115,8 +120,12 @@ def recommend(user_set, cand_set, data_path):
         for user in user_set:
             item_score_list = []
             for item in cand_set:
-                score = word_vectors.similarity(user, item) \
-                    if user in word_vectors and item in word_vectors else 0
+                # score = word_vectors.similarity(str(user), str(item)) \
+                #     if str(user) in word_vectors and str(item) in word_vectors else 0 + \
+                #     word_vectors.similarity(str(user), str(item_category_map[item])) \
+                #     if str(user) in word_vectors and str(item_category_map[item]) in word_vectors else 0
+                score = word_vectors.similarity(str(user), str(item)) + \
+                        word_vectors.similarity(str(user), str(item_category_map[item]))
                 item_score_list.append((item, score))
             item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
 
@@ -136,9 +145,9 @@ def main(args):
 
     if not os.path.exists(data_path):
         os.makedirs(data_path)
-    user_set, cand_set = preprocess_net(data_path, test_ratio)
+    user_set, cand_set, item_category_map = preprocess_net(data_path, test_ratio)
     run_model(smore_path, data_path, sample_times, walk_steps, alpha, dimensions)
-    recommend(user_set, cand_set, data_path)
+    recommend(user_set, cand_set, data_path, item_category_map)
 
 
 if __name__ == "__main__":
