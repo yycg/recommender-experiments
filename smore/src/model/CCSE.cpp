@@ -61,16 +61,19 @@ void CCSE::Init(int dim) {
     w_contextI.resize(pnet.MAX_vid);
     w_contextUU.resize(pnet.MAX_vid);
     w_contextII.resize(pnet.MAX_vid);
+    w_vertexP.resize(pnet.MAX_vid);
     w_contextP.resize(pnet.MAX_vid);
 
     for (long vid=0; vid<pnet.MAX_vid; ++vid)
     {
         w_vertexU[vid].resize(dim);
         w_vertexI[vid].resize(dim);
+        w_vertexP[vid].resize(dim);
         for (int d=0; d<dim;++d)
         {
             w_vertexU[vid][d] = (rand()/(double)RAND_MAX - 0.5) / dim;
             w_vertexI[vid][d] = (rand()/(double)RAND_MAX - 0.5) / dim;
+            w_vertexP[vid][d] = (rand()/(double)RAND_MAX - 0.5) / dim;
         }
         w_contextU[vid].resize(dim);
         w_contextI[vid].resize(dim);

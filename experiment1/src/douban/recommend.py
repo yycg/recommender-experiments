@@ -1,7 +1,9 @@
 import os
 import pickle
 from gensim.models import KeyedVectors
+from gensim import matutils
 import numpy as np
+from numpy import dot
 
 
 def recommend(data_path, representation_size, deepwalk_recommend_list, category2vec_recommend_list):
@@ -17,9 +19,10 @@ def recommend(data_path, representation_size, deepwalk_recommend_list, category2
 
     item_vectors_map = {}
     for item in word_vectors.vocab:
-        item_vectors_map[item] = word_vectors[item] + (doc_vectors["*dt_" + item_category_map[int(item)]]
-                                                       if int(item) in item_category_map else np.zeros(representation_size))
-                                                       # if int(item) in item_category_map and "*dt_" + item_category_map[int(item)] in doc_vectors else np.zeros(representation_size))
+        item_vectors_map[item] = word_vectors[item] + (doc_vectors["*dt_" + str(item_category_map[int(item)])]
+           # if int(item) in item_category_map else np.zeros(representation_size))
+           if int(item) in item_category_map and "*dt_" + str(item_category_map[int(item)]) in doc_vectors
+           else np.zeros(representation_size))
 
     with open(os.path.join(data_path, deepwalk_recommend_list), "w") as recommend:
         for user in user_set:
@@ -38,7 +41,8 @@ def recommend(data_path, representation_size, deepwalk_recommend_list, category2
         for user in user_set:
             item_score_list = []
             for cand in cand_set:
-                score = sum([item_vectors_map[str(cand)].dot(item_vectors_map[str(item)].T)
+                score = sum([dot(matutils.unitvec(item_vectors_map[str(cand)]),
+                                 matutils.unitvec(item_vectors_map[str(item)]))
                              for item in user_items_train_map[user]]) if str(cand) in word_vectors else 0
                 item_score_list.append((cand, score))
             item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)

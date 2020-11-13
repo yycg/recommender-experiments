@@ -18,6 +18,7 @@ if __name__ == "__main__":
     parser.add_argument("--window_size", default=5, type=int)
     parser.add_argument("--workers", default=50, type=int)
     parser.add_argument("--seed", default=0, type=int)
+    parser.add_argument("--lambda_factor", default=1, type=float)
     args = parser.parse_args()
 
     undirected = args.undirected
@@ -27,11 +28,13 @@ if __name__ == "__main__":
     window_size = args.window_size
     workers = args.workers
     seed = args.seed
+    lambda_factor = args.lambda_factor
     test_ratio = 0.25
 
     data_path = os.path.join("../../data/douban/category2vec", "number_walks{}".format(number_walks),
                              "walk_length{}".format(walk_length), "representation_size{}".format(representation_size),
-                             "window_size{}".format(window_size)) if args.data_path is None else args.data_path
+                             "window_size{}".format(window_size), "lambda_factor".format(lambda_factor)) \
+        if args.data_path is None else args.data_path
     input = "user_item_edge.txt"
     category_input = "category_item_edge.txt"
     wv_output = "wv.txt"

@@ -238,5 +238,6 @@ def main():
     run_model(smore_path, data_path)
     recommend(user_set, cand_set, data_path)
 
+
 if __name__ == "__main__":
     main()
