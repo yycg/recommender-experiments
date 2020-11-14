@@ -39,13 +39,13 @@ void CCSE::SaveWeights(string model_name){
                 for (int d=0; d<dim; ++d)
                     model << " " << w_vertexP[vid][d];
             // debug
-            if (strcmp(pnet.vertex_hash.keys[vid], "127334773") == 0) {
-                cout << pnet.vertex_hash.keys[vid] << endl;
-                cout << pnet.field[vid].fields[0] << endl;
-                for (int d=0; d<dim; ++d)
-                    model << " " << w_vertexP[vid][d];
-                cout << endl;
-            }
+            // if (strcmp(pnet.vertex_hash.keys[vid], "127334773") == 0) {
+            //     cout << pnet.vertex_hash.keys[vid] << endl;
+            //     cout << pnet.field[vid].fields[0] << endl;
+            //     for (int d=0; d<dim; ++d)
+            //         model << " " << w_vertexP[vid][d];
+            //     cout << endl;
+            // }
 
             model << endl;
         }

@@ -127,9 +127,9 @@ def recommend(user_set, cand_set, data_path, item_category_map):
                 item_score_list.append((item, score))
             item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
 
-            recommend.write(user + "\t")
+            recommend.write(str(user) + "\t")
             recommend.write(
-                ",".join([item_score[0] + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
+                ",".join([str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
 
 def main(args):
     test_ratio = 0.25
