@@ -7,7 +7,7 @@ import random
 # https://github.com/phanein/deepwalk/issues/29
 from deepwalk import graph
 from gensim.models import Word2Vec, Category2Vec
-from gensim.models.category2vec import TaggedLineDocument, CategoryTaggedLineDocument
+from gensim.models.category2vec import TaggedLineDocument
 
 
 def process(data_path, input, category_input, wv_output, docvecs_output, wordvecs_output, undirected, number_walks,
@@ -18,8 +18,6 @@ def process(data_path, input, category_input, wv_output, docvecs_output, wordvec
     print("Walking...")
     walks = graph.build_deepwalk_corpus(G, num_paths=number_walks,
                                         path_length=walk_length, alpha=0, rand=random.Random(seed))
-    user_walks = build_deepwalk_corpus(G, num_paths=number_walks,
-                                       path_length=walk_length, alpha=0, rand=random.Random(seed))
     category_walks = build_category_deepwalk_corpus(category_graph_map, num_paths=number_walks,
                                                     path_length=walk_length, alpha=0, rand=random.Random(seed))
 
@@ -29,7 +27,7 @@ def process(data_path, input, category_input, wv_output, docvecs_output, wordvec
 
     model.wv.save_word2vec_format(os.path.join(data_path, wv_output))
 
-    model = Category2Vec(user_walks, size=representation_size, window=window_size, min_count=0, dm=0, hs=0,
+    model = Category2Vec(walks, size=representation_size, window=window_size, min_count=0, dm=0, hs=0,
                          workers=workers, category_documents=category_walks)
     # model.wv.save_word2vec_format(os.path.join(data_path, wv_output))
     model.docvecs.save_word2vec_format(os.path.join(data_path, docvecs_output))
@@ -56,22 +54,7 @@ def load_category_edgelist(file_, undirected=True):
 
 
 def build_category_deepwalk_corpus(category_graph_map, num_paths, path_length, alpha=0, rand=random.Random(0)):
-    return CategoryTaggedLineDocument(category_graph_map, num_paths, path_length, alpha, rand)
-
-
-def build_deepwalk_corpus(G, num_paths, path_length, alpha=0, rand=random.Random(0)):
-    return TaggedLineDocument(G, num_paths, path_length, alpha, rand)
-
-    # walks = []
-    #
-    # nodes = list(G.nodes())
-    #
-    # for cnt in range(num_paths):
-    #     rand.shuffle(nodes)
-    #     for node in nodes:
-    #         walks.append(G.random_walk(path_length, rand=rand, alpha=alpha, start=node))
-    #
-    # return walks
+    return TaggedLineDocument(category_graph_map, num_paths, path_length, alpha, rand)
 
 
 def main():

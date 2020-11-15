@@ -475,7 +475,7 @@ class Category2Vec(BaseWordEmbeddingsModel):
     """
     def __init__(self, documents=None, corpus_file=None, dm_mean=None, dm=1, dbow_words=0, dm_concat=0,
                  dm_tag_count=1, docvecs=None, docvecs_mapfile=None, comment=None, trim_rule=None, callbacks=(),
-                 category_documents=None, **kwargs):
+                 **kwargs):
         """
 
         Parameters
@@ -618,8 +618,7 @@ class Category2Vec(BaseWordEmbeddingsModel):
                 raise TypeError("You must pass string as the corpus_file argument.")
             elif isinstance(documents, GeneratorType):
                 raise TypeError("You can't pass a generator as the documents argument. Try a sequence.")
-            self.build_vocab(documents=documents, corpus_file=corpus_file, trim_rule=trim_rule,
-                             category_documents=category_documents)
+            self.build_vocab(documents=documents, corpus_file=corpus_file, trim_rule=trim_rule)
             self.train(
                 documents=documents, corpus_file=corpus_file, total_examples=self.corpus_count,
                 total_words=self.corpus_total_words, epochs=self.epochs, start_alpha=self.alpha,
@@ -1135,7 +1134,7 @@ class Category2Vec(BaseWordEmbeddingsModel):
         return super(Category2Vec, self).estimate_memory(vocab_size, report=report)
 
     def build_vocab(self, documents=None, corpus_file=None, update=False, progress_per=10000, keep_raw_vocab=False,
-                    trim_rule=None, category_documents=None, **kwargs):
+                    trim_rule=None, **kwargs):
         """Build vocabulary from a sequence of documents (can be a once-only generator stream).
 
         Parameters
@@ -1175,16 +1174,15 @@ class Category2Vec(BaseWordEmbeddingsModel):
         """
         total_words, corpus_count = self.vocabulary.scan_vocab(
             documents=documents, corpus_file=corpus_file, docvecs=self.docvecs,
-            progress_per=progress_per, trim_rule=trim_rule, category_documents=category_documents
+            progress_per=progress_per, trim_rule=trim_rule
         )
         self.corpus_count = corpus_count
         self.corpus_total_words = total_words
-
         report_values = self.vocabulary.prepare_vocab(
             self.hs, self.negative, self.wv, update=update, keep_raw_vocab=keep_raw_vocab, trim_rule=trim_rule,
             **kwargs)
-        report_values['memory'] = self.estimate_memory(vocab_size=report_values['num_retained_words'])
 
+        report_values['memory'] = self.estimate_memory(vocab_size=report_values['num_retained_words'])
         self.trainables.prepare_weights(
             self.hs, self.negative, self.wv, self.docvecs, update=update)
 
@@ -1292,24 +1290,14 @@ class Doc2VecVocab(Word2VecVocab):
             max_vocab_size=max_vocab_size, min_count=min_count, sample=sample,
             sorted_vocab=sorted_vocab, null_word=null_word, ns_exponent=ns_exponent)
 
-    def _scan_vocab(self, documents, docvecs, progress_per, trim_rule, category_documents):
-        vocab = defaultdict(int)
-        sum_total_words, sum_corpus_count = self._scan_documents_vocab(documents, docvecs, progress_per, trim_rule, vocab)
-        total_words, corpus_count = self._scan_documents_vocab(category_documents, docvecs, progress_per, trim_rule, vocab)
-        sum_total_words += total_words
-        sum_corpus_count += corpus_count
-
-        self.raw_vocab = vocab
-        return sum_total_words, sum_corpus_count
-
-    def _scan_documents_vocab(self, documents, docvecs, progress_per, trim_rule, vocab):
+    def _scan_vocab(self, documents, docvecs, progress_per, trim_rule):
         document_no = -1
         total_words = 0
         min_reduce = 1
         interval_start = default_timer() - 0.00001  # guard against next sample being identical
         interval_count = 0
         checked_string_types = 0
-
+        vocab = defaultdict(int)
         for document_no, document in enumerate(documents):
             if not checked_string_types:
                 if isinstance(document.words, string_types):
@@ -1341,11 +1329,10 @@ class Doc2VecVocab(Word2VecVocab):
                 min_reduce += 1
 
         corpus_count = document_no + 1
-
+        self.raw_vocab = vocab
         return total_words, corpus_count
 
-    def scan_vocab(self, documents=None, corpus_file=None, docvecs=None, progress_per=10000, trim_rule=None,
-                   category_documents=None):
+    def scan_vocab(self, documents=None, corpus_file=None, docvecs=None, progress_per=10000, trim_rule=None):
         """Create the models Vocabulary: A mapping from unique words in the corpus to their frequency count.
 
         Parameters
@@ -1384,7 +1371,7 @@ class Doc2VecVocab(Word2VecVocab):
         if corpus_file is not None:
             documents = TaggedLineDocument(corpus_file)
 
-        total_words, corpus_count = self._scan_vocab(documents, docvecs, progress_per, trim_rule, category_documents)
+        total_words, corpus_count = self._scan_vocab(documents, docvecs, progress_per, trim_rule)
 
         logger.info(
             "collected %i word types and %i unique tags from a corpus of %i examples and %i words",
@@ -1522,71 +1509,6 @@ class TaggedBrownCorpus(object):
                 yield TaggedDocument(words, ['%s_SENT_%s' % (fname, item_no)])
 
 
-class CategoryTaggedLineDocument(object):
-    """Iterate over a file that contains documents: one line = :class:`~gensim.models.doc2vec.TaggedDocument` object.
-
-    Words are expected to be already preprocessed and separated by whitespace. Document tags are constructed
-    automatically from the document line number (each document gets a unique integer tag).
-
-    """
-    # def __init__(self, source):
-    #     """
-    #
-    #     Parameters
-    #     ----------
-    #     source : string or a file-like object
-    #         Path to the file on disk, or an already-open file object (must support `seek(0)`).
-    #
-    #     Examples
-    #     --------
-    #     .. sourcecode:: pycon
-    #
-    #         >>> from gensim.test.utils import datapath
-    #         >>> from gensim.models.doc2vec import TaggedLineDocument
-    #         >>>
-    #         >>> for document in TaggedLineDocument(datapath("head500.noblanks.cor")):
-    #         ...     pass
-    #
-    #     """
-    #     self.source = source
-
-    def __init__(self, category_graph_map, num_paths, path_length, alpha, rand):
-        self.category_graph_map = category_graph_map
-        self.num_paths = num_paths
-        self.path_length = path_length
-        self.alpha = alpha
-        self.rand = rand
-
-    def __iter__(self):
-        """Iterate through the lines in the source.
-
-        Yields
-        ------
-        :class:`~gensim.models.doc2vec.TaggedDocument`
-            Document from `source` specified in the constructor.
-
-        """
-        # try:
-        #     # Assume it is a file-like object and try treating it as such
-        #     # Things that don't have seek will trigger an exception
-        #     self.source.seek(0)
-        #     for item_no, line in enumerate(self.source):
-        #         yield TaggedDocument(utils.to_unicode(line).split(), [item_no])
-        # except AttributeError:
-        #     # If it didn't work like a file, use it as a string filename
-        #     with utils.smart_open(self.source) as fin:
-        #         for item_no, line in enumerate(fin):
-        #             yield TaggedDocument(utils.to_unicode(line).split(), [item_no])
-
-        for category, G in self.category_graph_map.items():
-            nodes = list(G.nodes())
-
-            for cnt in range(self.num_paths):
-                self.rand.shuffle(nodes)
-                for node in nodes:
-                    walk = G.random_walk(self.path_length, rand=self.rand, alpha=self.alpha, start=node)
-                    yield TaggedDocument(walk, [category])
-
 class TaggedLineDocument(object):
     """Iterate over a file that contains documents: one line = :class:`~gensim.models.doc2vec.TaggedDocument` object.
 
@@ -1594,33 +1516,26 @@ class TaggedLineDocument(object):
     automatically from the document line number (each document gets a unique integer tag).
 
     """
-    # def __init__(self, source):
-    #     """
-    #
-    #     Parameters
-    #     ----------
-    #     source : string or a file-like object
-    #         Path to the file on disk, or an already-open file object (must support `seek(0)`).
-    #
-    #     Examples
-    #     --------
-    #     .. sourcecode:: pycon
-    #
-    #         >>> from gensim.test.utils import datapath
-    #         >>> from gensim.models.doc2vec import TaggedLineDocument
-    #         >>>
-    #         >>> for document in TaggedLineDocument(datapath("head500.noblanks.cor")):
-    #         ...     pass
-    #
-    #     """
-    #     self.source = source
+    def __init__(self, source):
+        """
 
-    def __init__(self, G, num_paths, path_length, alpha, rand):
-        self.G = G
-        self.num_paths = num_paths
-        self.path_length = path_length
-        self.alpha = alpha
-        self.rand = rand
+        Parameters
+        ----------
+        source : string or a file-like object
+            Path to the file on disk, or an already-open file object (must support `seek(0)`).
+
+        Examples
+        --------
+        .. sourcecode:: pycon
+
+            >>> from gensim.test.utils import datapath
+            >>> from gensim.models.doc2vec import TaggedLineDocument
+            >>>
+            >>> for document in TaggedLineDocument(datapath("head500.noblanks.cor")):
+            ...     pass
+
+        """
+        self.source = source
 
     def __iter__(self):
         """Iterate through the lines in the source.
@@ -1631,23 +1546,14 @@ class TaggedLineDocument(object):
             Document from `source` specified in the constructor.
 
         """
-        # try:
-        #     # Assume it is a file-like object and try treating it as such
-        #     # Things that don't have seek will trigger an exception
-        #     self.source.seek(0)
-        #     for item_no, line in enumerate(self.source):
-        #         yield TaggedDocument(utils.to_unicode(line).split(), [item_no])
-        # except AttributeError:
-        #     # If it didn't work like a file, use it as a string filename
-        #     with utils.smart_open(self.source) as fin:
-        #         for item_no, line in enumerate(fin):
-        #             yield TaggedDocument(utils.to_unicode(line).split(), [item_no])
-
-        nodes = list(self.G.nodes())
-        item_no = 0
-        for cnt in range(self.num_paths):
-            self.rand.shuffle(nodes)
-            for node in nodes:
-                walk = self.G.random_walk(self.path_length, rand=self.rand, alpha=self.alpha, start=node)
-                yield TaggedDocument(walk, [str(item_no)])
-                item_no += 1
+        try:
+            # Assume it is a file-like object and try treating it as such
+            # Things that don't have seek will trigger an exception
+            self.source.seek(0)
+            for item_no, line in enumerate(self.source):
+                yield TaggedDocument(utils.to_unicode(line).split(), [item_no])
+        except AttributeError:
+            # If it didn't work like a file, use it as a string filename
+            with utils.smart_open(self.source) as fin:
+                for item_no, line in enumerate(fin):
+                    yield TaggedDocument(utils.to_unicode(line).split(), [item_no])
