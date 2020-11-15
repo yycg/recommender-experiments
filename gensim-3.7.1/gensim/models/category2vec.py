@@ -1769,7 +1769,7 @@ class TaggedBrownCorpus(object):
                 yield TaggedDocument(words, ['%s_SENT_%s' % (fname, item_no)])
 
 
-class TaggedLineDocument(object):
+class CategoryTaggedLineDocument(object):
     """Iterate over a file that contains documents: one line = :class:`~gensim.models.doc2vec.TaggedDocument` object.
 
     Words are expected to be already preprocessed and separated by whitespace. Document tags are constructed
@@ -1833,3 +1833,69 @@ class TaggedLineDocument(object):
                 for node in nodes:
                     walk = G.random_walk(self.path_length, rand=self.rand, alpha=self.alpha, start=node)
                     yield TaggedDocument(walk, [category])
+
+
+class TaggedLineDocument(object):
+    """Iterate over a file that contains documents: one line = :class:`~gensim.models.doc2vec.TaggedDocument` object.
+
+    Words are expected to be already preprocessed and separated by whitespace. Document tags are constructed
+    automatically from the document line number (each document gets a unique integer tag).
+
+    """
+    # def __init__(self, source):
+    #     """
+    #
+    #     Parameters
+    #     ----------
+    #     source : string or a file-like object
+    #         Path to the file on disk, or an already-open file object (must support `seek(0)`).
+    #
+    #     Examples
+    #     --------
+    #     .. sourcecode:: pycon
+    #
+    #         >>> from gensim.test.utils import datapath
+    #         >>> from gensim.models.doc2vec import TaggedLineDocument
+    #         >>>
+    #         >>> for document in TaggedLineDocument(datapath("head500.noblanks.cor")):
+    #         ...     pass
+    #
+    #     """
+    #     self.source = source
+
+    def __init__(self, G, num_paths, path_length, alpha, rand):
+        self.G = G
+        self.num_paths = num_paths
+        self.path_length = path_length
+        self.alpha = alpha
+        self.rand = rand
+
+    def __iter__(self):
+        """Iterate through the lines in the source.
+
+        Yields
+        ------
+        :class:`~gensim.models.doc2vec.TaggedDocument`
+            Document from `source` specified in the constructor.
+
+        """
+        # try:
+        #     # Assume it is a file-like object and try treating it as such
+        #     # Things that don't have seek will trigger an exception
+        #     self.source.seek(0)
+        #     for item_no, line in enumerate(self.source):
+        #         yield TaggedDocument(utils.to_unicode(line).split(), [item_no])
+        # except AttributeError:
+        #     # If it didn't work like a file, use it as a string filename
+        #     with utils.smart_open(self.source) as fin:
+        #         for item_no, line in enumerate(fin):
+        #             yield TaggedDocument(utils.to_unicode(line).split(), [item_no])
+
+        nodes = list(self.G.nodes())
+        item_no = 0
+        for cnt in range(self.num_paths):
+            self.rand.shuffle(nodes)
+            for node in nodes:
+                walk = self.G.random_walk(self.path_length, rand=self.rand, alpha=self.alpha, start=node)
+                yield TaggedDocument(walk, [str(item_no)])
+                item_no += 1

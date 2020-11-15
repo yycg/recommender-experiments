@@ -942,6 +942,88 @@ class Doc2Vec(BaseWordEmbeddingsModel):
 
         return doctag_vectors[0]
 
+    def infer_vector_mod(self, category_walks, alpha=None, min_alpha=None, epochs=None, steps=None):
+        """Infer a vector for given post-bulk training document.
+
+        Notes
+        -----
+        Subsequent calls to this function may infer different representations for the same document.
+        For a more stable representation, increase the number of steps to assert a stricket convergence.
+
+        Parameters
+        ----------
+        doc_words : list of str
+            A document for which the vector representation will be inferred.
+        alpha : float, optional
+            The initial learning rate. If unspecified, value from model initialization will be reused.
+        min_alpha : float, optional
+            Learning rate will linearly drop to `min_alpha` over all inference epochs. If unspecified,
+            value from model initialization will be reused.
+        epochs : int, optional
+            Number of times to train the new document. Larger values take more time, but may improve
+            quality and run-to-run stability of inferred vectors. If unspecified, the `epochs` value
+            from model initialization will be reused.
+        steps : int, optional, deprecated
+            Previous name for `epochs`, still available for now for backward compatibility: if
+            `epochs` is unspecified but `steps` is, the `steps` value will be used.
+
+        Returns
+        -------
+        np.ndarray
+            The inferred paragraph vector for the new document.
+
+        """
+        # if isinstance(doc_words, string_types):
+        #     raise TypeError("Parameter doc_words of infer_vector() must be a list of strings (not a single string).")
+
+        alpha = alpha or self.alpha
+        min_alpha = min_alpha or self.min_alpha
+        epochs = epochs or steps or self.epochs
+
+        category_doctag_map = {}
+        index = 0
+        for doc in category_walks:
+            if doc.tags not in category_doctag_map:
+                doctag_vectors, doctag_locks = self.trainables.get_doctag_trainables(doc.words,self.docvecs.vector_size)
+                category_doctag_map[doc.tags] = {
+                    "doctag_indexes": [index],
+                    "doctag_vectors": doctag_vectors,
+                    "doctag_locks": doctag_locks
+                }
+                index += 1
+
+        for doc in category_walks:
+            # doctag_vectors, doctag_locks = self.trainables.get_doctag_trainables(doc.words, self.docvecs.vector_size)
+            # doctag_indexes = [0]
+            doctag_indexes = category_doctag_map[doc.tags]["doctag_indexes"]
+            doctag_vectors = category_doctag_map[doc.tags]["doctag_vectors"]
+            doctag_locks = category_doctag_map[doc.tags]["doctag_locks"]
+            work = zeros(self.trainables.layer1_size, dtype=REAL)
+            if not self.sg:
+                neu1 = matutils.zeros_aligned(self.trainables.layer1_size, dtype=REAL)
+
+            alpha_delta = (alpha - min_alpha) / max(epochs - 1, 1)
+
+            for i in range(epochs):
+                if self.sg:
+                    train_document_dbow(
+                        self, doc.words, doctag_indexes, alpha, work,
+                        learn_words=False, learn_hidden=False, doctag_vectors=doctag_vectors, doctag_locks=doctag_locks
+                    )
+                elif self.dm_concat:
+                    train_document_dm_concat(
+                        self, doc.words, doctag_indexes, alpha, work, neu1,
+                        learn_words=False, learn_hidden=False, doctag_vectors=doctag_vectors, doctag_locks=doctag_locks
+                    )
+                else:
+                    train_document_dm(
+                        self, doc.words, doctag_indexes, alpha, work, neu1,
+                        learn_words=False, learn_hidden=False, doctag_vectors=doctag_vectors, doctag_locks=doctag_locks
+                    )
+                alpha -= alpha_delta
+
+        return category_doctag_map
+
     def __getitem__(self, tag):
         """Get the vector representation of (possible multi-term) tag.
 

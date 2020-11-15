@@ -6,8 +6,8 @@ import random
 
 # https://github.com/phanein/deepwalk/issues/29
 from deepwalk import graph
-from gensim.models import Word2Vec, Category2Vec
-from gensim.models.category2vec import TaggedLineDocument
+from gensim.models import Word2Vec, Category2Vec, Doc2Vec
+from gensim.models.category2vec import CategoryTaggedLineDocument, TaggedLineDocument
 
 
 def process(data_path, input, category_input, wv_output, docvecs_output, wordvecs_output, undirected, number_walks,
@@ -18,20 +18,33 @@ def process(data_path, input, category_input, wv_output, docvecs_output, wordvec
     print("Walking...")
     walks = graph.build_deepwalk_corpus(G, num_paths=number_walks,
                                         path_length=walk_length, alpha=0, rand=random.Random(seed))
+    user_walks = build_deepwalk_corpus(G, num_paths=number_walks,
+                                             path_length=walk_length, alpha=0, rand=random.Random(seed))
     category_walks = build_category_deepwalk_corpus(category_graph_map, num_paths=number_walks,
                                                     path_length=walk_length, alpha=0, rand=random.Random(seed))
 
     print("Training...")
-    model = Word2Vec(walks, size=representation_size, window=window_size, min_count=0, sg=1, hs=1,
+    model = Word2Vec(walks, size=representation_size, window=window_size, min_count=0, sg=1, hs=0,
                      workers=workers)
 
     model.wv.save_word2vec_format(os.path.join(data_path, wv_output))
 
-    model = Category2Vec(walks, size=representation_size, window=window_size, min_count=0, dm=0, hs=0,
-                         workers=workers, category_documents=category_walks)
-    # model.wv.save_word2vec_format(os.path.join(data_path, wv_output))
-    model.docvecs.save_word2vec_format(os.path.join(data_path, docvecs_output))
-    model.wordvecs.save_word2vec_format(os.path.join(data_path, wordvecs_output))
+    # model = Category2Vec(walks, size=representation_size, window=window_size, min_count=0, dm=0, hs=0,
+    #                      workers=workers, category_documents=category_walks)
+    # # model.wv.save_word2vec_format(os.path.join(data_path, wv_output))
+    # model.docvecs.save_word2vec_format(os.path.join(data_path, docvecs_output))
+    # model.wordvecs.save_word2vec_format(os.path.join(data_path, wordvecs_output))
+
+    model = Doc2Vec(user_walks, size=representation_size, window_size=window_size, min_count=0, workers=workers,
+                    hs=0, dm=0)
+    model.wv.save_word2vec_format(os.path.join(data_path, wordvecs_output))
+    start_alpha = 0.01
+    infer_epoch = 1000
+    with open(os.path.join(data_path, docvecs_output), "w") as output:
+        # output.write(" ".join([str(x) for x in model.infer_vector_mod(category_walks, alpha=start_alpha, steps=infer_epoch)]) + "\n")
+        for category, doctag in model.infer_vector_mod(category_walks, alpha=start_alpha, steps=infer_epoch).items():
+            output.write(str(category) + " ")
+            output.write(" ".join(str(x) for x in doctag["doctag_vectors"]) + "\n")
 
 
 def load_category_edgelist(file_, undirected=True):
@@ -54,7 +67,22 @@ def load_category_edgelist(file_, undirected=True):
 
 
 def build_category_deepwalk_corpus(category_graph_map, num_paths, path_length, alpha=0, rand=random.Random(0)):
-    return TaggedLineDocument(category_graph_map, num_paths, path_length, alpha, rand)
+    return CategoryTaggedLineDocument(category_graph_map, num_paths, path_length, alpha, rand)
+
+
+def build_deepwalk_corpus(G, num_paths, path_length, alpha=0, rand=random.Random(0)):
+    return TaggedLineDocument(G, num_paths, path_length, alpha, rand)
+
+    # walks = []
+    #
+    # nodes = list(G.nodes())
+    #
+    # for cnt in range(num_paths):
+    #     rand.shuffle(nodes)
+    #     for node in nodes:
+    #         walks.append(G.random_walk(path_length, rand=rand, alpha=alpha, start=node))
+    #
+    # return walks
 
 
 def main():
