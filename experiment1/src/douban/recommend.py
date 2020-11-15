@@ -6,7 +6,7 @@ import numpy as np
 from numpy import dot
 
 
-def recommend(data_path, representation_size, deepwalk_recommend_list, category2vec_recommend_list):
+def recommend(data_path, representation_size, deepwalk_recommend_list, category2vec_recommend_list, lambda_factor):
     user_set = pickle.load(open(os.path.join(data_path, 'user_set.pkl'), 'rb'))
     cand_set = pickle.load(open(os.path.join(data_path, 'cand_set.pkl'), 'rb'))
     user_items_train_map = pickle.load(open(os.path.join(data_path, 'user_items_train_map.pkl'), 'rb'))
@@ -22,7 +22,7 @@ def recommend(data_path, representation_size, deepwalk_recommend_list, category2
         item_vectors_map[item] = word_vectors[item] + (doc_vectors["*dt_" + str(item_category_map[int(item)])]
            # if int(item) in item_category_map else np.zeros(representation_size))
            if int(item) in item_category_map and "*dt_" + str(item_category_map[int(item)]) in doc_vectors
-           else np.zeros(representation_size))
+           else np.zeros(representation_size)) * lambda_factor
 
     with open(os.path.join(data_path, deepwalk_recommend_list), "w") as recommend:
         for user in user_set:
@@ -49,8 +49,7 @@ def recommend(data_path, representation_size, deepwalk_recommend_list, category2
 
             recommend.write(str(user) + "\t")
             recommend.write(
-                ",".join(
-                    [str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
+                ",".join([str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
 
 
 def main():
@@ -58,8 +57,9 @@ def main():
     representation_size = 64
     deepwalk_recommend_list = "deepwalk.tsv"
     category2vec_recommend_list = "category2vec.tsv"
+    lambda_factor = 1
 
-    recommend(data_path, representation_size, deepwalk_recommend_list, category2vec_recommend_list)
+    recommend(data_path, representation_size, deepwalk_recommend_list, category2vec_recommend_list, lambda_factor)
 
 
 if __name__ == "__main__":

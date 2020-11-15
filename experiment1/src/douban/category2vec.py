@@ -49,4 +49,4 @@ if __name__ == "__main__":
     build_graph(data_path)
     process(data_path, input, category_input, wv_output, docvecs_output, wordvecs_output, undirected, number_walks,
             walk_length, representation_size, window_size, workers, seed)
-    recommend(data_path, representation_size, deepwalk_recommend_list, category2vec_recommend_list)
+    recommend(data_path, representation_size, deepwalk_recommend_list, category2vec_recommend_list, lambda_factor)
