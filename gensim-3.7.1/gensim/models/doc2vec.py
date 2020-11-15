@@ -983,9 +983,9 @@ class Doc2Vec(BaseWordEmbeddingsModel):
         category_doctag_map = {}
         index = 0
         for doc in category_walks:
-            if doc.tags not in category_doctag_map:
+            if doc.tags[0] not in category_doctag_map:
                 doctag_vectors, doctag_locks = self.trainables.get_doctag_trainables(doc.words,self.docvecs.vector_size)
-                category_doctag_map[doc.tags] = {
+                category_doctag_map[doc.tags[0]] = {
                     "doctag_indexes": [index],
                     "doctag_vectors": doctag_vectors,
                     "doctag_locks": doctag_locks
@@ -995,9 +995,9 @@ class Doc2Vec(BaseWordEmbeddingsModel):
         for doc in category_walks:
             # doctag_vectors, doctag_locks = self.trainables.get_doctag_trainables(doc.words, self.docvecs.vector_size)
             # doctag_indexes = [0]
-            doctag_indexes = category_doctag_map[doc.tags]["doctag_indexes"]
-            doctag_vectors = category_doctag_map[doc.tags]["doctag_vectors"]
-            doctag_locks = category_doctag_map[doc.tags]["doctag_locks"]
+            doctag_indexes = category_doctag_map[doc.tags[0]]["doctag_indexes"]
+            doctag_vectors = category_doctag_map[doc.tags[0]]["doctag_vectors"]
+            doctag_locks = category_doctag_map[doc.tags[0]]["doctag_locks"]
             work = zeros(self.trainables.layer1_size, dtype=REAL)
             if not self.sg:
                 neu1 = matutils.zeros_aligned(self.trainables.layer1_size, dtype=REAL)
