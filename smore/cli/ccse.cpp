@@ -48,6 +48,7 @@ int main(int argc, char **argv){
     char network_file[100], rep_file[100], field_file[100];
     int dimensions=64, negative_samples=5, sample_times=10, threads=1, walk_steps=5;
     double init_alpha=0.025, reg=0.01;
+    double lambda1=0.05, lambda2=0.05;
 
     if ((i = ArgPos((char *)"-train", argc, argv)) > 0) strcpy(network_file, argv[i + 1]);
     if ((i = ArgPos((char *)"-save", argc, argv)) > 0) strcpy(rep_file, argv[i + 1]);
@@ -57,13 +58,15 @@ int main(int argc, char **argv){
     if ((i = ArgPos((char *)"-walk_steps", argc, argv)) > 0) walk_steps = atoi(argv[i + 1]);
     if ((i = ArgPos((char *)"-alpha", argc, argv)) > 0) init_alpha = atof(argv[i + 1]);
     if ((i = ArgPos((char *)"-threads", argc, argv)) > 0) threads = atoi(argv[i + 1]);
+    if ((i = ArgPos((char *)"-lambda1", argc, argv)) > 0) lambda1 = atof(argv[i + 1]);
+    if ((i = ArgPos((char *)"-lambda2", argc, argv)) > 0) lambda2 = atof(argv[i + 1]);
     
     CCSE *ccse;
     ccse = new CCSE();
     ccse->LoadEdgeList(network_file, 1);
     ccse->LoadFieldMeta(field_file);
     ccse->Init(dimensions);
-    ccse->Train(sample_times, walk_steps, init_alpha, threads);
+    ccse->Train(sample_times, walk_steps, init_alpha, threads, lambda1, lambda2);
     ccse->SaveWeights(rep_file);
 
     return 0;

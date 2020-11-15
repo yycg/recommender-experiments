@@ -101,7 +101,7 @@ void CCSE::Init(int dim) {
 }
 
 
-void CCSE::Train(int sample_times, int walk_steps, double alpha, int workers){
+void CCSE::Train(int sample_times, int walk_steps, double alpha, int workers, double lambda1, double lambda2){
     
     omp_set_num_threads(workers);
 
@@ -148,9 +148,9 @@ void CCSE::Train(int sample_times, int walk_steps, double alpha, int workers){
                 pnet.UpdateFactorizedPair(w_vertexU, w_vertexI, vid, cid, dim, 0.025, negative_samples, _alpha);
             } else {
                 // item_property-item pair
-                pnet.UpdateBatchCommunity(w_vertexI, w_contextI, cid, vid, dim, 0.0, walk_steps, negative_samples, _alpha*0.05);
-                pnet.UpdateBatchCommunity(w_vertexP, w_contextP, vid, cid, dim, 0.0, walk_steps, negative_samples, _alpha*0.05);
-                pnet.UpdateFactorizedPair(w_vertexP, w_vertexI, vid, cid, dim, 0.025, negative_samples, _alpha);
+                // pnet.UpdateBatchCommunity(w_vertexI, w_contextI, cid, vid, dim, 0.0, walk_steps, negative_samples, _alpha*0.05);
+                pnet.UpdateBatchCommunity(w_vertexP, w_contextP, vid, cid, dim, 0.0, walk_steps, negative_samples, _alpha*lambda2);
+                pnet.UpdateFactorizedPair(w_vertexP, w_vertexI, vid, cid, dim, 0.025, negative_samples, _alpha*lambda1);
             }
 
             count ++;

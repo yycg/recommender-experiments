@@ -102,16 +102,16 @@ def preprocess_net(data_path, test_ratio):
     return test_user_set, test_cand_set, item_category_map
 
 
-def run_model(smore_path, data_path, sample_times, walk_steps, alpha, dimensions):
+def run_model(smore_path, data_path, sample_times, walk_steps, alpha, dimensions, lambda1, lambda2):
     # ccse
     cmd = smore_path + "/cli/ccse -train " + data_path + "/net.txt -save " + data_path + "/rep_ccse.txt -field " \
-          + data_path + "/field.txt -dimensions {3} -sample_times {0} -walk_steps {1} -alpha {2} -threads 1" \
-              .format(sample_times, walk_steps, alpha, dimensions)
+          + data_path + "/field.txt -dimensions {3} -sample_times {0} -walk_steps {1} -alpha {2} -threads 1 " \
+          "-lambda1 {4} -lambda2 {5}".format(sample_times, walk_steps, alpha, dimensions, lambda1, lambda2)
     print(cmd)
     os.system(cmd)
 
 
-def recommend(user_set, cand_set, data_path, item_category_map):
+def recommend(user_set, cand_set, data_path, item_category_map, lambda_factor):
     # ccse
     # load word vectors file
     word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_ccse.txt"), binary=False)
@@ -122,7 +122,7 @@ def recommend(user_set, cand_set, data_path, item_category_map):
             for item in cand_set:
                 score = word_vectors.similarity(str(user), str(item)) \
                     if str(user) in word_vectors and str(item) in word_vectors else 0 + \
-                    word_vectors.similarity(str(user), str(item_category_map[item])) \
+                    lambda_factor * word_vectors.similarity(str(user), str(item_category_map[item])) \
                     if str(user) in word_vectors and str(item_category_map[item]) in word_vectors else 0
                 item_score_list.append((item, score))
             item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
@@ -137,16 +137,21 @@ def main(args):
     walk_steps = args.walk_steps
     alpha = args.alpha
     dimensions = args.dimensions
+    lambda1 = args.lambda1
+    lambda2 = args.lambda2
+    lambda_factor = args.lambda_factor
     data_path = os.path.join("../../data/douban/ccse", "sample_times{}".format(sample_times),
                              "walk_steps{}".format(walk_steps), "alpha{}".format(alpha),
-                             "dimensions{}".format(dimensions)) if args.data_path is None else args.data_path
+                             "dimensions{}".format(dimensions), "lambda1{}".format(lambda1),
+                             "lambda2{}".format(lambda2), "lambda_factor{}".format(lambda_factor)) \
+        if args.data_path is None else args.data_path
     smore_path = args.smore_path
 
     if not os.path.exists(data_path):
         os.makedirs(data_path)
     user_set, cand_set, item_category_map = preprocess_net(data_path, test_ratio)
-    run_model(smore_path, data_path, sample_times, walk_steps, alpha, dimensions)
-    recommend(user_set, cand_set, data_path, item_category_map)
+    run_model(smore_path, data_path, sample_times, walk_steps, alpha, dimensions, lambda1, lambda2)
+    recommend(user_set, cand_set, data_path, item_category_map, lambda_factor)
 
 
 if __name__ == "__main__":
@@ -159,6 +164,9 @@ if __name__ == "__main__":
     parser.add_argument("--walk_steps", default=5, type=int)
     parser.add_argument("--alpha", default=0.01, type=float)
     parser.add_argument("--dimensions", default=128, type=int)
+    parser.add_argument("--lambda1", default=0.05, type=float)
+    parser.add_argument("--lambda2", default=0.05, type=float)
+    parser.add_argument("--lambda_factor", default=0.05, type=float)
     args = parser.parse_args()
 
     main(args)
