@@ -45,7 +45,7 @@ int main(int argc, char **argv){
         return 0;
     }
     
-    char network_file[100], rep_file[100], field_file[100];
+    char network_file[1000], rep_file[1000], field_file[1000];
     int dimensions=64, negative_samples=5, sample_times=10, threads=1, walk_steps=5;
     double init_alpha=0.025, reg=0.01;
     double lambda1=0.05, lambda2=0.05;
