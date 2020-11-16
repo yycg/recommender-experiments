@@ -44,7 +44,7 @@ def process(data_path, input, category_input, wv_output, docvecs_output, wordvec
         # output.write(" ".join([str(x) for x in model.infer_vector_mod(category_walks, alpha=start_alpha, steps=infer_epoch)]) + "\n")
         for category, doctag in model.infer_vector_mod(category_walks, alpha=start_alpha, steps=infer_epoch).items():
             output.write(str(category) + " ")
-            output.write(" ".join(str(x) for x in doctag["doctag_vectors"]) + "\n")
+            output.write(" ".join(str(x) for x in doctag["doctag_vectors"][0]) + "\n")
 
 
 def load_category_edgelist(file_, undirected=True):

@@ -19,10 +19,13 @@ def recommend(data_path, representation_size, deepwalk_recommend_list, category2
 
     item_vectors_map = {}
     for item in word_vectors.vocab:
-        item_vectors_map[item] = word_vectors[item] + (doc_vectors["*dt_" + str(item_category_map[int(item)])]
-           # if int(item) in item_category_map else np.zeros(representation_size))
-           if int(item) in item_category_map and "*dt_" + str(item_category_map[int(item)]) in doc_vectors
-           else np.zeros(representation_size)) * lambda_factor
+        # item_vectors_map[item] = word_vectors[item] + (doc_vectors["*dt_" + str(item_category_map[int(item)])]
+        #    # if int(item) in item_category_map else np.zeros(representation_size))
+        #    if int(item) in item_category_map and "*dt_" + str(item_category_map[int(item)]) in doc_vectors
+        #    else np.zeros(representation_size)) * lambda_factor
+        item_vectors_map[item] = word_vectors[item] + (doc_vectors[str(item_category_map[int(item)])]
+            if int(item) in item_category_map and str(item_category_map[int(item)]) in doc_vectors
+            else np.zeros(representation_size)) * lambda_factor
 
     with open(os.path.join(data_path, deepwalk_recommend_list), "w") as recommend:
         for user in user_set:
