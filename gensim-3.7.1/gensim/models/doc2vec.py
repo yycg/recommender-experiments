@@ -976,7 +976,7 @@ class Doc2Vec(BaseWordEmbeddingsModel):
         # if isinstance(doc_words, string_types):
         #     raise TypeError("Parameter doc_words of infer_vector() must be a list of strings (not a single string).")
 
-        alpha = alpha or self.alpha
+        init_alpha = alpha or self.alpha
         min_alpha = min_alpha or self.min_alpha
         epochs = epochs or steps or self.epochs
 
@@ -993,9 +993,11 @@ class Doc2Vec(BaseWordEmbeddingsModel):
                 index += 1
 
         for doc in category_walks:
+            alpha = init_alpha
+
             # doctag_vectors, doctag_locks = self.trainables.get_doctag_trainables(doc.words, self.docvecs.vector_size)
-            # doctag_indexes = [0]
-            doctag_indexes = category_doctag_map[doc.tags[0]]["doctag_indexes"]
+            doctag_indexes = [0]
+            # doctag_indexes = category_doctag_map[doc.tags[0]]["doctag_indexes"]
             doctag_vectors = category_doctag_map[doc.tags[0]]["doctag_vectors"]
             doctag_locks = category_doctag_map[doc.tags[0]]["doctag_locks"]
             work = zeros(self.trainables.layer1_size, dtype=REAL)
