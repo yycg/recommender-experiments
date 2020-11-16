@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     data_path = os.path.join("../../data/douban/category2vec", "number_walks{}".format(number_walks),
                              "walk_length{}".format(walk_length), "representation_size{}".format(representation_size),
-                             "window_size{}".format(window_size), "lambda_factor".format(lambda_factor)) \
+                             "window_size{}".format(window_size), "lambda_factor{}".format(lambda_factor)) \
         if args.data_path is None else args.data_path
     input = "user_item_edge.txt"
     category_input = "category_item_edge.txt"

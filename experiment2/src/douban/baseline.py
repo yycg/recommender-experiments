@@ -201,7 +201,7 @@ def recommend(user_set, cand_set, data_path):
 
     # bpr
     word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_bpr.txt"), binary=False)
-    _recommend(user_set, cand_set, word_vectors, data_path, "bpf.tsv")
+    _recommend(user_set, cand_set, word_vectors, data_path, "bpr.tsv")
 
     # warp
     word_vectors = KeyedVectors.load_word2vec_format(os.path.join(data_path, "rep_warp.txt"), binary=False)
