@@ -42,7 +42,9 @@ def process(data_path, input, category_input, wv_output, docvecs_output, wordvec
     infer_epoch = 1000
     with open(os.path.join(data_path, docvecs_output), "w") as output:
         # output.write(" ".join([str(x) for x in model.infer_vector_mod(category_walks, alpha=start_alpha, steps=infer_epoch)]) + "\n")
-        for category, doctag in model.infer_vector_mod(category_walks, alpha=start_alpha, steps=infer_epoch).items():
+        category_doctag_map = model.infer_vector_mod(category_walks, alpha=start_alpha, steps=infer_epoch)
+        output.write(str(len(category_doctag_map.keys())) + " " + str(representation_size) + "\n")
+        for category, doctag in category_doctag_map.items():
             output.write(str(category) + " ")
             output.write(" ".join(str(x) for x in doctag["doctag_vectors"][0]) + "\n")
 
