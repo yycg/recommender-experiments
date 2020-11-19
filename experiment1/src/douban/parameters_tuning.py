@@ -20,8 +20,8 @@ def main():
             for representation_size in [64, 128, 256, 512]:  # dimensions
                 for window_size in [2, 3, 4, 5, 6, 8, 10]:  # window_size
                     for lambda_factor in [0.0025, 0.01, 0.025, 0.1, 0.25, 1, 2.5, 10, 25]:
-                        all_task.append(executor.submit(number_walks, walk_length, representation_size, window_size,
-                                                        lambda_factor))
+                        all_task.append(executor.submit(run_category2vec, number_walks, walk_length,
+                                                        representation_size, window_size, lambda_factor))
     for future in as_completed(all_task):
         data = future.result()
         print("{} succeed".format(data))
