@@ -22,11 +22,12 @@ def main():
                     for lambda1 in [0.0025, 0.01, 0.025, 0.1, 0.25]:
                         for lambda2 in [0.0025, 0.01, 0.025, 0.1, 0.25]:
                             for lambda_factor in [0.0025, 0.01, 0.025, 0.1, 0.25]:
-                                all_task.append(executor.submit(run_ccse, (sample_times, walk_steps, alpha, dimensions,
-                                                                           lambda1, lambda2, lambda_factor)))
+                                all_task.append(executor.submit(run_ccse, sample_times, walk_steps, alpha, dimensions,
+                                                                lambda1, lambda2, lambda_factor))
     for future in as_completed(all_task):
         data = future.result()
         print("{} succeed".format(data))
+
 
 if __name__ == '__main__':
     main()
