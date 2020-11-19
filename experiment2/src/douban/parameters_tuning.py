@@ -14,7 +14,7 @@ def run_ccse(sample_times, walk_steps, alpha, dimensions, lambda1, lambda2, lamb
 def main():
     # https://www.jianshu.com/p/b9b3d66aa0be
     all_task = []
-    executor = ThreadPoolExecutor(max_workers=10)
+    executor = ThreadPoolExecutor(max_workers=50)
     for sample_times in [20, 40, 60, 80, 100]:
         for walk_steps in [40, 60, 80]:
             for alpha in [0.0025, 0.01, 0.025, 0.1]:
