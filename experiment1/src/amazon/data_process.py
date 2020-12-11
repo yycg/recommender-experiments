@@ -162,9 +162,9 @@ if __name__ == '__main__':
     out_node_list = list(map(lambda x: x[1], list(node_pair.keys())))
     weight_list = list(node_pair.values())
     graph_df = pd.DataFrame({'in_node': in_node_list, 'out_node': out_node_list, 'weight': weight_list})
-    graph_df.to_csv('../../data/graph.csv', sep=' ', index=False, header=False)
+    graph_df.to_csv('../../data/amazon/graph.csv', sep=' ', index=False, header=False)
 
-    G = nx.read_edgelist('../../data/graph.csv', create_using=nx.DiGraph(), nodetype=None, data=[('weight', int)])
+    G = nx.read_edgelist('../../data/amazon/graph.csv', create_using=nx.DiGraph(), nodetype=None, data=[('weight', int)])
     walker = RandomWalker(G, p=args.p, q=args.q)
     print("Preprocess transition probs...")
     walker.preprocess_transition_probs()
@@ -191,8 +191,8 @@ if __name__ == '__main__':
             sku_side_info[feat] = sku_lbe.transform(sku_side_info[feat])
 
     sku_side_info = sku_side_info.sort_values(by=['sku_id'], ascending=True)
-    sku_side_info.to_csv('../../data/sku_side_info.csv', index=False, header=False, sep='\t')
+    sku_side_info.to_csv('../../data/amazon/sku_side_info.csv', index=False, header=False, sep='\t')
 
     # get pair
     all_pairs = get_graph_context_all_pairs(session_reproduce, args.window_size)
-    np.savetxt('../../data/all_pairs', X=all_pairs, fmt="%d", delimiter=" ")
+    np.savetxt('../../data/amazon/all_pairs', X=all_pairs, fmt="%d", delimiter=" ")
