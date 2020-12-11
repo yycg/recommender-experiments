@@ -132,6 +132,12 @@ if __name__ == '__main__':
     action_data_test = action_data.loc[test_index]
     action_data = action_data.loc[train_index]
 
+    with open("../../data/amazon/user-event-rsvp_test.tsv", "w") as test:
+        for index, row in action_data_test.iterrows():
+            user = row["user_id"]
+            item = row["event_id"]
+            test.write(str(user) + "\t" + str(item) + "\n")
+
     all_skus = action_data['sku_id'].unique()
     all_skus = pd.DataFrame({'sku_id': list(all_skus)})
     sku_lbe = LabelEncoder()
