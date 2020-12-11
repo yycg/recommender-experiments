@@ -1,4 +1,3 @@
-
 import pandas as pd
 import numpy as np
 from itertools import chain
@@ -8,6 +7,9 @@ import networkx as nx
 from walker import RandomWalker
 from sklearn.preprocessing import LabelEncoder
 import argparse
+from datetime import datetime
+import gzip
+import json
 
 
 def cnt_session(data, time_cut=30, cut_type=2):
@@ -17,7 +19,13 @@ def cnt_session(data, time_cut=30, cut_type=2):
     session = []
     tmp_session = []
     for i, item in enumerate(sku_list):
-        if type_list[i] == cut_type or (i < len(sku_list)-1 and (time_list[i+1] - time_list[i]).seconds/60 > time_cut) or i == len(sku_list)-1:
+        # if type_list[i] == cut_type or (i < len(sku_list)-1 and (time_list[i+1] - time_list[i]).seconds/60 > time_cut) or i == len(sku_list)-1:
+        #     tmp_session.append(item)
+        #     session.append(tmp_session)
+        #     tmp_session = []
+        # else:
+        #     tmp_session.append(item)
+        if i == len(sku_list)-1:
             tmp_session.append(item)
             session.append(tmp_session)
             tmp_session = []
@@ -48,10 +56,24 @@ def get_graph_context_all_pairs(walks, window_size):
     return np.array(all_pairs, dtype=np.int32)
 
 
+def parse(path):
+    g = gzip.open(path, 'rb')
+    for l in g:
+        yield json.loads(l)
+
+
+def getDF(path):
+    i = 0
+    df = {}
+    for d in parse(path):
+        df[i] = d
+        i += 1
+    return pd.DataFrame.from_dict(df, orient='index')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='manual to this script')
-    parser.add_argument("--data_path", type=str, default='./data/')
+    parser.add_argument("--data_path", type=str, default='/home/sjy2018/Amazon/')
     parser.add_argument("--p", type=float, default=0.25)
     parser.add_argument("--q", type=float, default=2)
     parser.add_argument("--num_walks", type=int, default=10)
@@ -59,8 +81,57 @@ if __name__ == '__main__':
     parser.add_argument("--window_size", type=int, default=5)
     args = parser.parse_known_args()[0]
 
-    action_data = pd.read_csv(args.data_path + 'action_head.csv', parse_dates=['action_time']).drop('module_id',
-                                                                                                    axis=1).dropna()
+    action_data = pd.read_csv(args.data_path + 'Clothing_Shoes_and_Jewelry.csv', header=None,
+                              names=["user_id", "sku_id", "rating", "timestamp"])
+    action_data.sort_values("timestamp", inplace=True)
+    timestamps = action_data["timestamp"].tolist()
+    datetimes = []
+    for timestamp in timestamps:
+        datetimes.append(datetime.fromtimestamp(timestamp))
+    action_data["action_time"] = datetimes
+    action_data["type"] = 1
+
+    # filter
+    user_count = {}
+    sku_count = {}
+    for index, row in action_data.iterrows():
+        user_id = row["user_id"]
+        sku_id = row["sku_id"]
+        user_count.setdefault(user_id, 0)
+        user_count[user_id] += 1
+        sku_count.setdefault(sku_id, 0)
+        sku_count[sku_id] += 1
+
+    index_list = []
+    for index, row in action_data.iterrows():
+        user_id = row["user_id"]
+        sku_id = row["sku_id"]
+        if 5 <= user_count[user_id] <= 20 and 5 <= sku_count[sku_id] <= 20:
+            index_list.append(index)
+    action_data = action_data.loc[index_list]
+
+    # split
+    test_ratio = 0.25
+
+    user_items_map = {}
+    for index, row in action_data.iterrows():
+        user = row["user_id"]
+        item = row["sku_id"]
+        user_items_map.setdefault(user, [])
+        user_items_map[user].append({"item": item, "index": index})
+
+    train_index = []
+    test_index = []
+    for user, maps in user_items_map.items():
+        for i in range(len(maps)):
+            if i < (1 - test_ratio) * len(maps):
+                train_index.append(maps[i]["index"])
+            else:
+                test_index.append(maps[i]["index"])
+
+    action_data_test = action_data.loc[test_index]
+    action_data = action_data.loc[train_index]
+
     all_skus = action_data['sku_id'].unique()
     all_skus = pd.DataFrame({'sku_id': list(all_skus)})
     sku_lbe = LabelEncoder()
@@ -91,9 +162,9 @@ if __name__ == '__main__':
     out_node_list = list(map(lambda x: x[1], list(node_pair.keys())))
     weight_list = list(node_pair.values())
     graph_df = pd.DataFrame({'in_node': in_node_list, 'out_node': out_node_list, 'weight': weight_list})
-    graph_df.to_csv('./data_cache/graph.csv', sep=' ', index=False, header=False)
+    graph_df.to_csv('../../data/amazon/graph.csv', sep=' ', index=False, header=False)
 
-    G = nx.read_edgelist('./data_cache/graph.csv', create_using=nx.DiGraph(), nodetype=None, data=[('weight', int)])
+    G = nx.read_edgelist('../../data/amazon/graph.csv', create_using=nx.DiGraph(), nodetype=None, data=[('weight', int)])
     walker = RandomWalker(G, p=args.p, q=args.q)
     print("Preprocess transition probs...")
     walker.preprocess_transition_probs()
@@ -103,7 +174,9 @@ if __name__ == '__main__':
     session_reproduce = list(filter(lambda x: len(x) > 2, session_reproduce))
 
     # add side info
-    product_data = pd.read_csv(args.data_path + 'jdata_product.csv').drop('market_time', axis=1).dropna()
+    df = getDF(args.data_path + 'meta_Clothing_Shoes_and_Jewelry.json.gz')
+    product_data = df.loc[:, ["asin", "brand"]]
+    product_data.rename(columns={'asin': 'sku_id'})
 
     all_skus['sku_id'] = sku_lbe.inverse_transform(all_skus['sku_id'])
     print("sku nums: " + str(all_skus.count()))
@@ -118,8 +191,8 @@ if __name__ == '__main__':
             sku_side_info[feat] = sku_lbe.transform(sku_side_info[feat])
 
     sku_side_info = sku_side_info.sort_values(by=['sku_id'], ascending=True)
-    sku_side_info.to_csv('./data_cache/sku_side_info.csv', index=False, header=False, sep='\t')
+    sku_side_info.to_csv('../../data/amazon/sku_side_info.csv', index=False, header=False, sep='\t')
 
     # get pair
     all_pairs = get_graph_context_all_pairs(session_reproduce, args.window_size)
-    np.savetxt('./data_cache/all_pairs', X=all_pairs, fmt="%d", delimiter=" ")
+    np.savetxt('../../data/amazon/all_pairs', X=all_pairs, fmt="%d", delimiter=" ")
