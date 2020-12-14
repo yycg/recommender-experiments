@@ -83,6 +83,7 @@ if __name__ == '__main__':
 
     action_data = pd.read_csv(args.data_path + 'Clothing_Shoes_and_Jewelry.csv', header=None,
                               names=["user_id", "sku_id", "rating", "timestamp"])
+    action_data = action_data.loc[action_data["timestamp"] > 1514736000]
     action_data.sort_values("timestamp", inplace=True)
     timestamps = action_data["timestamp"].tolist()
     datetimes = []
@@ -182,7 +183,7 @@ if __name__ == '__main__':
     # add side info
     df = getDF(args.data_path + 'meta_Clothing_Shoes_and_Jewelry.json.gz')
     product_data = df.loc[:, ["asin", "brand"]]
-    product_data.rename(columns={'asin': 'sku_id'})
+    product_data = product_data.rename(columns={'asin': 'sku_id'})
 
     all_skus['sku_id'] = sku_lbe.inverse_transform(all_skus['sku_id'])
     print("sku nums: " + str(all_skus.count()))
