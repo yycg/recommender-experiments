@@ -82,7 +82,7 @@ if __name__ == '__main__':
     args = parser.parse_known_args()[0]
 
     action_data = pd.read_csv(args.data_path + 'Clothing_Shoes_and_Jewelry.csv', header=None,
-                              names=["user_id", "sku_id", "rating", "timestamp"])
+                              names=["sku_id", "user_id", "rating", "timestamp"])
     action_data = action_data.loc[action_data["timestamp"] > 1514736000]
     action_data.sort_values("timestamp", inplace=True)
     timestamps = action_data["timestamp"].tolist()
