@@ -14,10 +14,10 @@ if __name__ == '__main__':
     parser.add_argument("--n_sampled", type=int, default=10)
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--lr", type=float, default=0.001)
-    parser.add_argument("--root_path", type=str, default='../../data/amazon/')
+    parser.add_argument("--root_path", type=str, default='../../../data/amazon/')
     parser.add_argument("--num_feat", type=int, default=4)
     parser.add_argument("--embedding_dim", type=int, default=128)
-    parser.add_argument("--outputEmbedFile", type=str, default='../../data/amazon/embedding/EGES.embed')
+    parser.add_argument("--outputEmbedFile", type=str, default='../../../data/amazon/embedding/EGES.embed')
     args = parser.parse_args()
 
     # read train_data
