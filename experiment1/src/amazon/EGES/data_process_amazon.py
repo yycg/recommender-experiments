@@ -187,7 +187,7 @@ if __name__ == '__main__':
 
     all_skus['sku_id'] = sku_lbe.inverse_transform(all_skus['sku_id'])
     print("sku nums: " + str(all_skus.count()))
-    sku_side_info = pd.merge(all_skus, product_data, on='sku_id', how='left').fillna(0)
+    sku_side_info = pd.merge(all_skus, product_data, on='sku_id', how='left').fillna("NaN")
 
     # id2index
     for feat in sku_side_info.columns:
