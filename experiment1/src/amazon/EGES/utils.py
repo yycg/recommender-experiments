@@ -35,10 +35,11 @@ def plot_embeddings(embebed_mat, side_info_mat):
 
 
 
-def write_embedding(embedding_result, outputFileName):
+def write_embedding(embedding_result, outputFileName, embedding_dim):
     f = open(outputFileName, 'w')
+    f.write(str(len(embedding_result)) + " " + str(embedding_dim) + "\n")
     for i in range(len(embedding_result)):
-        s = " ".join(str(f) for f in embedding_result[i].tolist())
+        s = str(i) + " " + " ".join(str(f) for f in embedding_result[i].tolist())
         f.write(s + "\n")
     f.close()
 

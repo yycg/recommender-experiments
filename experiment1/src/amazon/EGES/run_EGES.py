@@ -84,9 +84,9 @@ if __name__ == '__main__':
     feed_dict_test[EGES.inputs[-1]] = np.zeros((len(side_info), 1), dtype=np.int32)
     embedding_result = sess.run(EGES.merge_emb, feed_dict=feed_dict_test)
     print('saving embedding result...')
-    write_embedding(embedding_result, args.outputEmbedFile)
+    write_embedding(embedding_result, args.outputEmbedFile, args.embedding_dim)
 
-    print('visualization...')
-    plot_embeddings(embedding_result[:5000, :], side_info[:5000, :])
+    # print('visualization...')
+    # plot_embeddings(embedding_result[:5000, :], side_info[:5000, :])
 
 

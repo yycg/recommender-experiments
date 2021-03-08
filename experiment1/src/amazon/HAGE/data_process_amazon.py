@@ -102,7 +102,6 @@ if __name__ == '__main__':
     parser.add_argument("--window_size", type=int, default=5)
     args = parser.parse_known_args()[0]
 
-    # find topk timestamp
     with elapsed_timer("-- {0}s - %s" % ("find topk timestamp",)):
         q = PriorityQueue()
         k = 500000
@@ -148,7 +147,6 @@ if __name__ == '__main__':
         action_data["action_time"] = datetimes
         action_data["type"] = 1
 
-    # filter
     with elapsed_timer("-- {0}s - %s" % ("filter",)):
         user_count = {}
         sku_count = {}
@@ -168,7 +166,6 @@ if __name__ == '__main__':
                 index_list.append(index)
         action_data = action_data.loc[index_list]
 
-    # split
     with elapsed_timer("-- {0}s - %s" % ("split",)):
         test_ratio = 0.25
 
@@ -188,8 +185,16 @@ if __name__ == '__main__':
                 else:
                     test_index.append(maps[i]["index"])
 
+        all_skus = action_data['sku_id'].unique()
+        all_skus = pd.DataFrame({'sku_id': list(all_skus)})
+        sku_lbe = LabelEncoder()
+        # Fit label encoder and return encoded labels.
+        all_skus['sku_id'] = sku_lbe.fit_transform(all_skus['sku_id'])
+        # Transform labels to normalized encoding.
+        action_data['sku_id'] = sku_lbe.transform(action_data['sku_id'])
+
         action_data_test = action_data.loc[test_index]
-        action_data = action_data.loc[train_index]
+        action_data_train = action_data.loc[train_index]
 
         with open("../../../data/amazon/user-event-rsvp_test.tsv", "w") as test:
             for index, row in action_data_test.iterrows():
@@ -197,15 +202,16 @@ if __name__ == '__main__':
                 item = row["sku_id"]
                 test.write(str(user) + "\t" + str(item) + "\n")
 
-        all_skus = action_data['sku_id'].unique()
-        all_skus = pd.DataFrame({'sku_id': list(all_skus)})
-        sku_lbe = LabelEncoder()
-        all_skus['sku_id'] = sku_lbe.fit_transform(all_skus['sku_id'])
-        action_data['sku_id'] = sku_lbe.transform(action_data['sku_id'])
+        with open("../../../data/amazon/train.tsv", "w") as test:
+            for index, row in action_data_train.iterrows():
+                user = row["user_id"]
+                item = row["sku_id"]
+                test.write(str(user) + "\t" + str(item) + "\n")
 
+    with elapsed_timer("-- {0}s - %s" % ("make session list",)):
         print('make session list\n')
         start_time = time.time()
-        session_list = get_session(action_data, use_type=[1, 2, 3, 5])
+        session_list = get_session(action_data_train, use_type=[1, 2, 3, 5])
         session_list_all = []
         for item_list in session_list:
             for session in item_list:
@@ -245,6 +251,7 @@ if __name__ == '__main__':
         product_data = df.loc[:, ["asin", "brand"]]
         product_data = product_data.rename(columns={'asin': 'sku_id'})
 
+        # Transform labels back to original encoding.
         all_skus['sku_id'] = sku_lbe.inverse_transform(all_skus['sku_id'])
         print("sku nums: " + str(all_skus.count()))
         sku_side_info = pd.merge(all_skus, product_data, on='sku_id', how='left').fillna("NaN")
