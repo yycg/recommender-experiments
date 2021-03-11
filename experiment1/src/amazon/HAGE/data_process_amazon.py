@@ -12,6 +12,9 @@ import gzip
 import json
 import contextlib
 from queue import PriorityQueue
+import itertools
+from deepwalk import graph
+import random
 
 
 class StubLogger(object):
@@ -90,6 +93,93 @@ def getDF(path):
         df[i] = d
         i += 1
     return pd.DataFrame.from_dict(df, orient='index')
+
+
+class TrieNode(object):
+    def __init__(self, val, leaf, children, index):
+        self.val, self.leaf, self.children, self.index = val, leaf, children, index
+
+
+class Trie(object):
+    def __init__(self):
+        self.root = TrieNode("", False, {}, -1)
+        self.num_category = 0
+        self.index_category_map = {}
+
+    def insert(self, leaf, path):
+        category_path = []
+
+        node = self.root
+        for category in path:
+            if category not in node.children:
+                node.children[category] = TrieNode(category, False, {}, self.num_category)
+                self.index_category_map[self.num_category] = node.children[category]
+                self.num_category += 1
+            category_path.append(node.children[category].index)
+            node = node.children[category]
+        node.children[leaf] = TrieNode(leaf, True, {}, -1)
+
+        return category_path
+
+
+def load_category_edgelist(file_, undirected=True):
+    category_graph_map = {}
+    with open(file_) as f:
+        for l in f:
+            c, x, y = l.strip().split()[:3]
+            x = int(x)
+            y = int(y)
+            category_graph_map.setdefault(c, graph.Graph())
+            G = category_graph_map[c]
+            G[x].append(y)
+            if undirected:
+                G[y].append(x)
+
+    for category, G in category_graph_map.items():
+        G.make_consistent()
+
+    return category_graph_map
+
+
+def random_walk(category_graph_map, num_paths, path_length, alpha=0, rand=random.Random(0)):
+    for category, G in category_graph_map.items():
+        nodes = list(G.nodes())
+
+        for cnt in range(num_paths):
+            rand.shuffle(nodes)
+            for node in nodes:
+                walk = G.random_walk(path_length, rand=rand, alpha=alpha, start=node)
+                yield [category] + walk
+
+
+def get_category_graph_context_all_pairs(category_category_children_walks, category_item_children_walks,
+                                         window_size, num_items):
+    all_pairs = []
+
+    # category_category_children_walks
+    for walk in category_category_children_walks:
+        for i in range(len(walk)):
+            for j in range(i - window_size, i + window_size + 1):
+                if i == j or j < 1 or j >= len(walk):
+                    continue
+                else:
+                    # (category, category)
+                    all_pairs.append([num_items + int(walk[i]), num_items + int(walk[j])])
+
+    # category_item_children_walks
+    for walk in category_item_children_walks:
+        for i in range(len(walk)):
+            for j in range(i - window_size, i + window_size + 1):
+                if i == j or j < 1 or j >= len(walk):
+                    continue
+                elif i == 0:
+                    # (category, item)
+                    all_pairs.append([num_items + int(walk[i]), int(walk[j])])
+                else:
+                    # (item, item)
+                    all_pairs.append([int(walk[i]), int(walk[j])])
+
+    return np.array(all_pairs, dtype=np.int32)
 
 
 if __name__ == '__main__':
@@ -220,7 +310,6 @@ if __name__ == '__main__':
 
         print('make session list done, time cost {0}'.format(str(time.time() - start_time)))
 
-    # session2graph
     with elapsed_timer("-- {0}s - %s" % ("session2graph",)):
         node_pair = dict()
         for session in session_list_all:
@@ -236,6 +325,7 @@ if __name__ == '__main__':
         graph_df = pd.DataFrame({'in_node': in_node_list, 'out_node': out_node_list, 'weight': weight_list})
         graph_df.to_csv('../../../data/amazon/graph.csv', sep=' ', index=False, header=False)
 
+    with elapsed_timer("-- {0}s - %s" % ("random walk",)):
         G = nx.read_edgelist('../../../data/amazon/graph.csv', create_using=nx.DiGraph(), nodetype=None, data=[('weight', int)])
         walker = RandomWalker(G, p=args.p, q=args.q)
         print("Preprocess transition probs...")
@@ -245,7 +335,6 @@ if __name__ == '__main__':
                                                   verbose=1)
         session_reproduce = list(filter(lambda x: len(x) > 2, session_reproduce))
 
-    # add side info
     with elapsed_timer("-- {0}s - %s" % ("add side info",)):
         df = getDF(args.data_path + 'meta_Clothing_Shoes_and_Jewelry_reduced.json.gz')
         product_data = df.loc[:, ["asin", "brand"]]
@@ -256,8 +345,7 @@ if __name__ == '__main__':
         print("sku nums: " + str(all_skus.count()))
         sku_side_info = pd.merge(all_skus, product_data, on='sku_id', how='left').fillna("NaN")
 
-    # id2index
-    with elapsed_timer("-- {0}s - %s" % ("id2index",)):
+        # id2index
         for feat in sku_side_info.columns:
             if feat != 'sku_id':
                 lbe = LabelEncoder()
@@ -268,7 +356,83 @@ if __name__ == '__main__':
         sku_side_info = sku_side_info.sort_values(by=['sku_id'], ascending=True)
         sku_side_info.to_csv('../../../data/amazon/sku_side_info.csv', index=False, header=False, sep='\t')
 
-    # get pair
     with elapsed_timer("-- {0}s - %s" % ("get pair",)):
         all_pairs = get_graph_context_all_pairs(session_reproduce, args.window_size)
         np.savetxt('../../../data/amazon/all_pairs', X=all_pairs, fmt="%d", delimiter=" ")
+
+    with elapsed_timer("-- {0}s - %s" % ("add category",)):
+        product_data = df.loc[:, ["asin", "category"]]
+        product_data = product_data.rename(columns={'asin': 'sku_id'})
+
+        sku_category = pd.merge(all_skus, product_data, on='sku_id', how='left').fillna("NaN")
+
+        sku_category['sku_id'] = sku_lbe.transform(sku_category['sku_id'])
+        sku_category = sku_category.sort_values(by=['sku_id'], ascending=True)
+
+        category_column = []
+        trie = Trie()
+        for index, row in sku_category.iterrows():
+            leaf = row['sku_id']
+            path = row['category']
+            category_column.append(trie.insert(leaf, path))
+        sku_category['category'] = category_column
+        sku_category.to_csv('../../../data/amazon/sku_category.csv', index=False, header=False, sep='\t')
+
+        category_item_children_map = {}
+        category_category_children_map = {}
+        for i in range(trie.num_category):
+            node = trie.index_category_map[i]
+            item_children = []
+            category_children = []
+            for _, child_node in node.children.items():
+                if child_node.leaf:
+                    item_children.append(child_node.val)
+                else:
+                    category_children.append(child_node.index)
+            if len(item_children) > 0:
+                category_item_children_map[i] = item_children
+            if len(category_children) > 0:
+                category_category_children_map[i] = category_children
+
+        with open("../../../data/amazon/category_category_children.csv", "w") as file:
+            for category, category_children in category_category_children_map.items():
+                file.write(str(category) + "\t" + ",".join([str(category) for category in category_children]) + "\n")
+
+        with open("../../../data/amazon/category_item_children.csv", "w") as file:
+            for category, item_children in category_item_children_map.items():
+                file.write(str(category) + "\t" + ",".join([str(item) for item in item_children]) + "\n")
+
+    with elapsed_timer("-- {0}s - %s" % ("build graph",)):
+        with open("../../../data/amazon/category_category_children.csv", "r") as reader, \
+                open("../../../data/amazon/category_category_children_edge.txt", "w") as writer:
+            for line in reader:
+                columns = line.strip().split("\t")
+                category = columns[0]
+                items = columns[1].split(",")
+                edges = itertools.permutations(items, 2)
+                for edge in edges:
+                    writer.write(category + " " + " ".join(edge) + "\n")
+
+        with open("../../../data/amazon/category_item_children.csv", "r") as reader, \
+                open("../../../data/amazon/category_item_children_edge.txt", "w") as writer:
+            for line in reader:
+                columns = line.strip().split("\t")
+                category = columns[0]
+                items = columns[1].split(",")
+                edges = itertools.permutations(items, 2)
+                for edge in edges:
+                    writer.write(category + " " + " ".join(edge) + "\n")
+
+    with elapsed_timer("-- {0}s - %s" % ("random walk",)):
+        category_category_children_graph_map = load_category_edgelist("../../../data/amazon/category_category_children_edge.txt")
+        category_category_children_walks = random_walk(category_category_children_graph_map, args.num_walks, args.walk_length)
+
+        category_item_children_graph_map = load_category_edgelist("../../../data/amazon/category_item_children_edge.txt")
+        category_item_children_walks = random_walk(category_item_children_graph_map, args.num_walks, args.walk_length)
+
+    with elapsed_timer("-- {0}s - %s" % ("get pair",)):
+        num_items = len(all_skus['sku_id'])
+        category_all_pairs = get_category_graph_context_all_pairs(category_category_children_walks,
+                                                                  category_item_children_walks,
+                                                                  args.window_size, num_items)
+        np.savetxt('../../../data/amazon/category_all_pairs', X=category_all_pairs, fmt="%d", delimiter=" ")

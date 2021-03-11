@@ -256,8 +256,7 @@ if __name__ == '__main__':
         print("sku nums: " + str(all_skus.count()))
         sku_side_info = pd.merge(all_skus, product_data, on='sku_id', how='left').fillna("NaN")
 
-    # id2index
-    with elapsed_timer("-- {0}s - %s" % ("id2index",)):
+        # id2index
         for feat in sku_side_info.columns:
             if feat != 'sku_id':
                 lbe = LabelEncoder()
