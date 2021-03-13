@@ -20,6 +20,8 @@ if __name__ == '__main__':
     parser.add_argument("--num_feat", type=int, default=2)
     parser.add_argument("--embedding_dim", type=int, default=128)
     parser.add_argument("--outputEmbedFile", type=str, default='../../../data/amazon/embedding/EGES.embed')
+    # parameters related to the second skip-gram
+    parser.add_argument("--num_category_feat", type=int, default=1)
     args = parser.parse_args()
 
     # read train_data
@@ -35,8 +37,21 @@ if __name__ == '__main__':
     end_time = time.time()
     print('time consumed for read features: %.2f' % (end_time - start_time))
 
-    EGES = EGES_Model(len(side_info), args.num_feat, feature_lens, n_sampled=args.n_sampled, embedding_dim=args.embedding_dim,
-                      lr=args.lr)
+    # read train data of the second skip-gram
+    print('read features of the second skip-gram...')
+    start_time = time.time()
+    category_side_info = np.loadtxt(args.root_path + 'category_side_info.csv', dtype=np.int32, delimiter='\t')
+    category_all_pairs = np.loadtxt(args.root_path + 'category_all_pairs', dtype=np.int32, delimiter=' ')
+    # feature_lens表示side_info中每个feature的取值个数，例如feature_lens = [3933, 1692]
+    category_feature_lens = []
+    for i in range(side_info.shape[1]):
+        tmp_len = len(set(side_info[:, i]))
+        category_feature_lens.append(tmp_len)
+    end_time = time.time()
+    print('time consumed for read features of the second skip-gram: %.2f' % (end_time - start_time))
+
+    EGES = EGES_Model(len(side_info), args.num_feat, feature_lens, len(category_side_info), args.num_category_feat,
+                      category_feature_lens, n_sampled=args.n_sampled, embedding_dim=args.embedding_dim, lr=args.lr)
 
     # init model
     print('init...')
@@ -51,10 +66,12 @@ if __name__ == '__main__':
 
     print_every_k_iterations = 100
     loss = 0
+    category_loss = 0
     iteration = 0
     start = time.time()
 
     max_iter = len(all_pairs)//args.batch_size*args.epochs
+    category_batch_size = len(category_all_pairs)*args.epochs//max_iter
     for iter in range(max_iter):
         iteration += 1
         batch_features, batch_labels = next(graph_context_batch_iter(all_pairs, args.batch_size, side_info,
@@ -73,6 +90,25 @@ if __name__ == '__main__':
                   "Avg. Training loss: {:.4f}".format(loss / print_every_k_iterations),
                   "{:.4f} sec/batch".format((end - start) / print_every_k_iterations))
             loss = 0
+            start = time.time()
+
+        # train the second skip-gram
+        batch_features, batch_labels = next(graph_context_batch_iter(category_all_pairs, category_batch_size,
+                                                                     category_side_info, args.num_category_feat))
+        feed_dict = {input_col: batch_features[:, i] for i, input_col in enumerate(EGES.category_inputs[:-1])}
+        feed_dict[EGES.category_inputs[-1]] = batch_labels
+        _, train_loss = sess.run([EGES.category_train_op, EGES.category_cost], feed_dict=feed_dict)
+
+        category_loss += train_loss
+
+        if iteration % print_every_k_iterations == 0:
+            end = time.time()
+            e = iteration * category_batch_size // len(category_all_pairs)
+            print("Epoch {}/{}".format(e, args.epochs),
+                  "Iteration: {}".format(iteration),
+                  "Avg. Training loss: {:.4f}".format(category_loss / print_every_k_iterations),
+                  "{:.4f} sec/batch".format((end - start) / print_every_k_iterations))
+            category_loss = 0
             start = time.time()
 
     print('optimization finished...')

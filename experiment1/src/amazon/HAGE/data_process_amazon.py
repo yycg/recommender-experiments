@@ -154,7 +154,9 @@ def random_walk(category_graph_map, num_paths, path_length, alpha=0, rand=random
 
 def get_category_graph_context_all_pairs(category_category_children_walks, category_item_children_walks,
                                          window_size, num_items):
-    all_pairs = []
+    category_category_all_pairs = []
+    category_item_all_pairs = []
+    item_item_all_pairs = []
 
     # category_category_children_walks
     for walk in category_category_children_walks:
@@ -164,7 +166,7 @@ def get_category_graph_context_all_pairs(category_category_children_walks, categ
                     continue
                 else:
                     # (category, category)
-                    all_pairs.append([num_items + int(walk[i]), num_items + int(walk[j])])
+                    category_category_all_pairs.append([int(walk[i]), int(walk[j])])
 
     # category_item_children_walks
     for walk in category_item_children_walks:
@@ -174,12 +176,14 @@ def get_category_graph_context_all_pairs(category_category_children_walks, categ
                     continue
                 elif i == 0:
                     # (category, item)
-                    all_pairs.append([num_items + int(walk[i]), int(walk[j])])
+                    category_item_all_pairs.append([int(walk[i]), int(walk[j])])
                 else:
                     # (item, item)
-                    all_pairs.append([int(walk[i]), int(walk[j])])
+                    item_item_all_pairs.append([int(walk[i]), int(walk[j])])
 
-    return np.array(all_pairs, dtype=np.int32)
+    return (np.array(category_category_all_pairs, dtype=np.int32),
+            np.array(category_item_all_pairs, dtype=np.int32),
+            np.array(item_item_all_pairs, dtype=np.int32))
 
 
 if __name__ == '__main__':
@@ -402,6 +406,12 @@ if __name__ == '__main__':
             for category, item_children in category_item_children_map.items():
                 file.write(str(category) + "\t" + ",".join([str(item) for item in item_children]) + "\n")
 
+        with open("../../../data/amazon/category_side_info.csv", "w", encoding="utf-8") as file:
+            for i in range(trie.num_category):
+                node = trie.index_category_map[i]
+                # file.write(str(i) + "\t" + node.val + "\n")
+                file.write(str(i) + "\n")
+
     with elapsed_timer("-- {0}s - %s" % ("build graph",)):
         with open("../../../data/amazon/category_category_children.csv", "r") as reader, \
                 open("../../../data/amazon/category_category_children_edge.txt", "w") as writer:
@@ -432,7 +442,11 @@ if __name__ == '__main__':
 
     with elapsed_timer("-- {0}s - %s" % ("get pair",)):
         num_items = len(all_skus['sku_id'])
-        category_all_pairs = get_category_graph_context_all_pairs(category_category_children_walks,
-                                                                  category_item_children_walks,
-                                                                  args.window_size, num_items)
-        np.savetxt('../../../data/amazon/category_all_pairs', X=category_all_pairs, fmt="%d", delimiter=" ")
+        category_category_all_pairs, category_item_all_pairs, item_item_all_pairs = \
+            get_category_graph_context_all_pairs(category_category_children_walks,
+                                                 category_item_children_walks,
+                                                 args.window_size, num_items)
+        np.savetxt('../../../data/amazon/category_category_all_pairs', X=category_category_all_pairs,
+                   fmt="%d", delimiter=" ")
+        np.savetxt('../../../data/amazon/category_item_all_pairs', X=category_item_all_pairs, fmt="%d", delimiter=" ")
+        np.savetxt('../../../data/amazon/item_item_all_pairs', X=item_item_all_pairs, fmt="%d", delimiter=" ")
