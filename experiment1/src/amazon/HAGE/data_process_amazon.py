@@ -196,38 +196,38 @@ if __name__ == '__main__':
     parser.add_argument("--window_size", type=int, default=5)
     args = parser.parse_known_args()[0]
 
-    with elapsed_timer("-- {0}s - %s" % ("find topk timestamp",)):
-        q = PriorityQueue()
-        k = 500000
-        with open(args.data_path + 'Clothing_Shoes_and_Jewelry.csv', 'r') as action:
-            for line in action:
-                action_columns = line.split(',')
-                q.put(int(action_columns[3]))
-                if q.qsize() > k:
-                    q.get()
-        top_k_timestamp = q.get()
-        print("top_k_timestamp: " + str(top_k_timestamp))
-
-    item_ids = set()
-    with elapsed_timer("-- {0}s - %s" % ("reduce amazon dataset size",)):
-        with open(args.data_path + 'Clothing_Shoes_and_Jewelry.csv', 'r') as action:
-            with open(args.data_path + 'Clothing_Shoes_and_Jewelry_reduced.csv', 'w') as action_reduced:
-                for line in action:
-                    action_columns = line.split(',')
-                    if int(action_columns[3]) >= top_k_timestamp:
-                        action_reduced.write(line)
-                        item_ids.add(action_columns[0])
-
-    with elapsed_timer("-- {0}s - %s" % ("reduce meta dataset size",)):
-        with open(args.data_path + 'meta_Clothing_Shoes_and_Jewelry.json', 'r') as meta:
-            with open(args.data_path + 'meta_Clothing_Shoes_and_Jewelry_reduced.json', 'w') as meta_reduced:
-                for line in meta:
-                    meta_map = json.loads(line)
-                    if meta_map["asin"] in item_ids:
-                        meta_reduced.write(line)
-        with open(args.data_path + 'meta_Clothing_Shoes_and_Jewelry_reduced.json', "rb") as meta_reduced:
-            with gzip.open(args.data_path + 'meta_Clothing_Shoes_and_Jewelry_reduced.json.gz', "wb") as meta_reduced_gz:
-                meta_reduced_gz.writelines(meta_reduced)
+    # with elapsed_timer("-- {0}s - %s" % ("find topk timestamp",)):
+    #     q = PriorityQueue()
+    #     k = 500000
+    #     with open(args.data_path + 'Clothing_Shoes_and_Jewelry.csv', 'r') as action:
+    #         for line in action:
+    #             action_columns = line.split(',')
+    #             q.put(int(action_columns[3]))
+    #             if q.qsize() > k:
+    #                 q.get()
+    #     top_k_timestamp = q.get()
+    #     print("top_k_timestamp: " + str(top_k_timestamp))
+    #
+    # item_ids = set()
+    # with elapsed_timer("-- {0}s - %s" % ("reduce amazon dataset size",)):
+    #     with open(args.data_path + 'Clothing_Shoes_and_Jewelry.csv', 'r') as action:
+    #         with open(args.data_path + 'Clothing_Shoes_and_Jewelry_reduced.csv', 'w') as action_reduced:
+    #             for line in action:
+    #                 action_columns = line.split(',')
+    #                 if int(action_columns[3]) >= top_k_timestamp:
+    #                     action_reduced.write(line)
+    #                     item_ids.add(action_columns[0])
+    #
+    # with elapsed_timer("-- {0}s - %s" % ("reduce meta dataset size",)):
+    #     with open(args.data_path + 'meta_Clothing_Shoes_and_Jewelry.json', 'r') as meta:
+    #         with open(args.data_path + 'meta_Clothing_Shoes_and_Jewelry_reduced.json', 'w') as meta_reduced:
+    #             for line in meta:
+    #                 meta_map = json.loads(line)
+    #                 if meta_map["asin"] in item_ids:
+    #                     meta_reduced.write(line)
+    #     with open(args.data_path + 'meta_Clothing_Shoes_and_Jewelry_reduced.json', "rb") as meta_reduced:
+    #         with gzip.open(args.data_path + 'meta_Clothing_Shoes_and_Jewelry_reduced.json.gz', "wb") as meta_reduced_gz:
+    #             meta_reduced_gz.writelines(meta_reduced)
 
     with elapsed_timer("-- {0}s - %s" % ("read action data",)):
         action_data = pd.read_csv(args.data_path + 'Clothing_Shoes_and_Jewelry_reduced.csv', header=None,
@@ -381,6 +381,10 @@ if __name__ == '__main__':
             category_column.append(trie.insert(leaf, path))
         sku_category['category'] = category_column
         sku_category.to_csv('../../../data/amazon/sku_category.csv', index=False, header=False, sep='\t')
+
+        category_column = [categories[-1] for categories in sku_category["category"].to_list()]
+        sku_side_info["category"] = category_column
+        sku_side_info.to_csv('../../../data/amazon/sku_side_info_category.csv', index=False, header=False, sep='\t')
 
         category_item_children_map = {}
         category_category_children_map = {}

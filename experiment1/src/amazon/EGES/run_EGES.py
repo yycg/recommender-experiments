@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 import time
 import argparse
-from EGES_model import EGES_Model
+from HAGE_model import EGES_Model
 from utils import *
 
 
