@@ -173,6 +173,8 @@ def get_user_items_train_map(data_path):
             user_items_train_map.setdefault(user, [])
             user_items_train_map[user].append(item)
 
+    return user_items_train_map
+
 def run_model(data_path, smore_path, item2vec_path):
     # deepwalk
     cmd = smore_path + "/cli/deepwalk -train " + data_path + "/user_item_edge.txt -save " + data_path + \
