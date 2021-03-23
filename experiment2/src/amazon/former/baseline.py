@@ -7,7 +7,7 @@ amazon_path = "../../Amazon/AMAZON_FASHION.csv"
 test_ratio = 0.25
 
 CSE_path = "/media/shan/新加卷/Developer/smore"
-data_path = "../"
+data_path = "../../../"
 sample_times = 40
 walk_steps = 5
 alpha = 0.01

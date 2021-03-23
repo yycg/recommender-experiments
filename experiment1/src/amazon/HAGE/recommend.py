@@ -30,9 +30,9 @@ def recommend(data_path, user_set, cand_set):
             user_items_train_map[user].append(item)
 
     # load word vectors file
-    wv = KeyedVectors.load_word2vec_format(os.path.join(data_path, "embedding", "EGES.embed"), binary=False)
+    wv = KeyedVectors.load_word2vec_format(os.path.join(data_path, "embedding", "HAGE.embed"), binary=False)
 
-    with open(os.path.join(data_path, "EGES.tsv"), "w") as recommend:
+    with open(os.path.join(data_path, "HAGE.tsv"), "w") as recommend:
         for user in user_set:
             item_score_list = []
             for cand in cand_set:
