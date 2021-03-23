@@ -13,7 +13,7 @@ if __name__ == '__main__':
     parser.add_argument("--batch_size", type=int, default=2048)
     # 采样次数
     parser.add_argument("--n_sampled", type=int, default=10)
-    parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--root_path", type=str, default='../../../data/amazon/')
     # sku_side_info.csv的列数，第一列是物品id，后面列是特征id
