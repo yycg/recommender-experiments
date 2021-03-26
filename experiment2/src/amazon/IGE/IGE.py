@@ -88,7 +88,7 @@ if __name__ == '__main__':
     parser.add_argument("--batch_size", type=int, default=2048)
     # 采样次数
     parser.add_argument("--n_sampled", type=int, default=10)
-    parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--root_path", type=str, default='../../../data/amazon/')
     # sku_side_info.csv的列数，第一列是物品id，后面列是特征id
@@ -159,7 +159,7 @@ if __name__ == '__main__':
     test_s_u[:, 0] = range(num_users)
     feed_dict_test = {input_col: list(test_s_u[:, i]) for i, input_col in enumerate(IGE.inputs[:-1])}
     feed_dict_test[IGE.inputs[-1]] = np.zeros((num_users, 1), dtype=np.int32)
-    embedding_result = sess.run(IGE.embedding, feed_dict=feed_dict_test)
+    embedding_result = sess.run(IGE.embedding[0], feed_dict=feed_dict_test)
     print('saving embedding result...')
     write_embedding(embedding_result, args.outputUserEmbedFile, args.embedding_dim)
 
@@ -168,6 +168,6 @@ if __name__ == '__main__':
     test_s_u[:, 0] = range(num_items)
     feed_dict_test = {input_col: list(test_s_u[:, i]) for i, input_col in enumerate(IGE.inputs[:-1])}
     feed_dict_test[IGE.inputs[-1]] = np.zeros((num_items, 1), dtype=np.int32)
-    embedding_result = sess.run(IGE.embedding, feed_dict=feed_dict_test)
+    embedding_result = sess.run(IGE.embedding[1], feed_dict=feed_dict_test)
     print('saving embedding result...')
     write_embedding(embedding_result, args.outputItemEmbedFile, args.embedding_dim)
