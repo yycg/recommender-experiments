@@ -49,7 +49,7 @@ def graph_context_batch_iter(all_pairs, batch_size, side_info, num_features):
         start_idx = np.random.randint(0, len(all_pairs) - batch_size)
         batch_idx = np.array(range(start_idx, start_idx + batch_size))
         batch_idx = np.random.permutation(batch_idx)
-        batch = np.zeros((batch_size, num_features), dtype=np.int32)
+        batch = np.zeros((batch_size, num_features+1), dtype=np.int32)
         labels = np.zeros((batch_size, 1), dtype=np.int32)
         batch[:] = side_info[all_pairs[batch_idx, 0]]
         labels[:, 0] = all_pairs[batch_idx, 1]

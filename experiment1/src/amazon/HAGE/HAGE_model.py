@@ -77,7 +77,7 @@ class HAGE_Model:
 
     def input_init(self):
         input_list = []
-        for i in range(self.num_feat):
+        for i in range(self.num_feat+1):
             input_col = tf.placeholder(tf.int32, [None], name='inputs_'+str(i))
             input_list.append(input_col)
         input_list.append(tf.placeholder(tf.int32, shape=[None, 1], name='label'))

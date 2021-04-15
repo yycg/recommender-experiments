@@ -28,7 +28,7 @@ if __name__ == '__main__':
     # read train_data
     print('read features...')
     start_time = time.time()
-    side_info = np.loadtxt(args.root_path + 'sku_side_info.csv', dtype=np.int32, delimiter='\t')
+    side_info = np.loadtxt(args.root_path + 'sku_side_info_category.csv', dtype=np.int32, delimiter='\t')
     all_pairs = np.loadtxt(args.root_path + 'all_pairs', dtype=np.int32, delimiter=' ')
     # feature_lens表示side_info中每个feature的取值个数，例如feature_lens = [3933, 1692]
     feature_lens = []
