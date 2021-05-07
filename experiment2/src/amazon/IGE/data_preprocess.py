@@ -176,3 +176,34 @@ if __name__ == '__main__':
                     file.write(str(item) + " " + " ".join([str(user) for user in permutation]) + "\n")
                 for user in users:
                     file.write(str(item) + " " + " ".join([str(user), str(user)]) + "\n")
+
+    with elapsed_timer("-- {0}s - %s" % ("statistic",)):
+        max_user_id = -1
+        max_item_id = -1
+        max_brand_id = -1
+
+        for index, row in action_data.iterrows():
+            user = row["user_id"]
+            item = row["sku_id"]
+            max_user_id = max(max_user_id, user)
+            max_item_id = max(max_item_id, item)
+
+        for index, row in sku_side_info.iterrows():
+            brand = row["brand"]
+            max_brand_id = max(max_brand_id, brand)
+
+        print("#users: " + str(max_user_id+1))
+        print("#items: " + str(max_item_id + 1))
+        print("#edges: " + str(len(action_data)))
+        print("#brands: " + str(max_brand_id + 1))
+
+    with elapsed_timer("-- {0}s - %s" % ("get adjacency list",)):
+        with open("../../../data/amazon/user_adjacency_list.csv", "w") as file:
+            for user, items in user_items_map.items():
+                for item in items:
+                    file.write(str(user) + " " + str(item) + "\n")
+
+        with open("../../../data/amazon/item_adjacency_list.csv", "w") as file:
+            for item, users in item_users_map.items():
+                for user in users:
+                    file.write(str(item) + " " + str(user) + "\n")
