@@ -1,36 +1,42 @@
 import numpy as np
-from tensorflow.python.keras.layers import Embedding, Input, Flatten, Concatenate, Dense
+import tensorflow as tf
+from tensorflow.python.keras.layers import Embedding, Input, Flatten, Concatenate, Dense, Lambda, Softmax
 from tensorflow.python.keras.models import Model
-from tensorflow.python.keras.utils import to_categorical
 import argparse
+import random
 
 def create_model(num_users, num_items, embedding_size):
-    u = Input(shape=(1,), name='user_input')
-    v_i = Input(shape=(1,), name='item_input')
+    """Reference: Tensorflow Word2Vec tutorial
+    https://www.tensorflow.org/tutorials/text/word2vec
+    """
+
+    u = Input(shape=(1,), name='user_input')  # shape=(?,1)
+    v_i = Input(shape=(1,), name='item_input')  # shape=(?,1)
+    v_j = Input(shape=(1,), name='item_output')  # shape=(?,1)
 
     user_emb = Embedding(num_users, embedding_size, name='user_emb')
     item_emb = Embedding(num_items, embedding_size, name='item_emb')
+    context_emb = Embedding(num_items, embedding_size * 2, name='context_emb')
 
-    u_emb = user_emb(u)
-    v_i_emb = item_emb(v_i)
+    u_emb = user_emb(u)   # shape=(?,1,1024)
+    v_i_emb = item_emb(v_i)  # shape=(?,1,1024)
+    v_j_emb = context_emb(v_j)  # shape=(?,1,2048)
 
     # Crucial to flatten an embedding vector!
-    # https://stackoverflow.com/questions/48855804/what-does-flatten-do-in-sequential-model-in-keras
-    user_latent = Flatten()(u_emb)
-    item_latent = Flatten()(v_i_emb)
+    user_latent = Flatten()(u_emb)  # shape=(?,1024)
+    input_item_latent = Flatten()(v_i_emb)  # shape=(?,1024)
+    output_item_latent = Flatten()(v_j_emb)  # shape=(?,2048)
 
-    # The 0-th layer is the concatenation of embedding layers
-    # https://keras.io/api/layers/merging_layers/concatenate/
-    vector = Concatenate()([user_latent, item_latent])
+    vector = Concatenate()([user_latent, input_item_latent])  # shape=(?,2048)
 
-    # https://keras.io/api/layers/core_layers/dense/
-    # https://keras.io/api/layers/activations/
-    hidden = Dense(embedding_size, activation='relu', name="hidden")(vector)
+    dots = Lambda(lambda x: tf.reduce_sum(
+        x[0] * x[1], axis=-1, keep_dims=False), name='dots')([vector, output_item_latent])  # shape=(?,)
 
-    softmax = Dense(num_items, activation='softmax', name='softmax')(hidden)
+    vector = Flatten()(dots)  # shape=(?,1)
 
-    # https://keras.io/api/models/model/
-    model = Model(inputs=[u, v_i], outputs=softmax)
+    softmax = Softmax(axis=-1)(vector)
+
+    model = Model(inputs=[u, v_i, v_j], outputs=softmax)
 
     return model, {'user': user_emb, 'item': item_emb}
 
@@ -39,10 +45,9 @@ def graph_context_batch_iter(s_u, batch_size):
         start_idx = np.random.randint(0, len(s_u) - batch_size)
         batch_idx = np.array(range(start_idx, start_idx + batch_size))
         batch_idx = np.random.permutation(batch_idx)
-        batch = np.zeros((batch_size, 2), dtype=np.int32)
-        labels = np.zeros((batch_size, 1), dtype=np.int32)
-        batch[:] = s_u[batch_idx, :2]
-        labels[:, 0] = s_u[batch_idx, 2]
+        batch = np.zeros((batch_size, 3), dtype=np.int32)
+        labels = np.ones(batch_size, dtype=np.int32)
+        batch[:, :] = s_u[batch_idx, :]
         yield batch, labels
 
 class IGE:
@@ -62,7 +67,7 @@ class IGE:
 
     def reset_model(self, opt='adam'):
         self.model, self.embedding_dict = create_model(self.num_users, self.num_items, self.embedding_size)
-        self.model.compile(opt, 'categorical_crossentropy')
+        self.model.compile(opt, loss='binary_crossentropy')
         self.batch_it = self.batch_iter()
 
     def batch_iter(self):
@@ -74,9 +79,24 @@ class IGE:
         while True:
             all_pairs = np.loadtxt(self.data_path + 's_u.csv', dtype=np.int32, delimiter=' ')
             batch_features, batch_labels = next(graph_context_batch_iter(all_pairs, self.batch_size))
-            yield ([batch_features[:, 0], batch_features[:, 1]], to_categorical(batch_labels, num_classes=self.num_items))
+            yield ([batch_features[:, 0], batch_features[:, 1], batch_features[:, 2]],
+                   batch_labels)  # (1024,)
 
-            # TODO: negative
+            # negative sample
+            for _ in range(self.negative_ratio):
+                negative_batch = np.zeros((self.batch_size, 3), dtype=np.int32)
+                negative_labels = np.zeros(self.batch_size, dtype=np.int32)
+                negative_batch[:, :2] = batch_features[:, :2]
+                for i in range(self.batch_size):
+                    negative_batch[i, 2] = self._negative_sample(true_class=batch_features[i, 2], num_classes=self.num_items)
+                yield ([negative_batch[:, 0], negative_batch[:, 1], negative_batch[:, 2]],
+                       negative_labels)
+
+    def _negative_sample(self, true_class, num_classes):
+        while True:
+            sample = random.randint(0, num_classes-1)
+            if not sample == true_class:
+                return sample
 
     def reset_training_config(self, batch_size, times):
         self.batch_size = batch_size
@@ -103,7 +123,7 @@ if __name__ == '__main__':
     parser.add_argument("--embedding_size", type=int, default=1024)
     parser.add_argument("--data_path", type=str, default='../../../data/amazon/')
     parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--edge_size", type=int, default=5434)
+    parser.add_argument("--edge_size", type=int, default=12640)
     parser.add_argument("--negative_ratio", type=int, default=5)
     args = parser.parse_args()
 
