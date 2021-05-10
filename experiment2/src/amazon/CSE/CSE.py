@@ -24,56 +24,55 @@ def create_model(num_users, num_items, embedding_size):
 
     user_direct = Input(shape=(1,), name='user_direct_input')  # shape=(?,1)
     item_direct = Input(shape=(1,), name='item_direct_input')  # shape=(?,1)
-    # user_vertex_high_order = Input(shape=(1,), name='user_vertex_high_order_input')  # shape=(?,1)
-    # user_context_high_order = Input(shape=(1,), name='user_context_high_order_input')  # shape=(?,1)
-    # item_vertex_high_order = Input(shape=(1,), name='item_vertex_high_order_input')  # shape=(?,1)
-    # item_context_high_order = Input(shape=(1,), name='item_context_high_order_input')  # shape=(?,1)
+    user_vertex_high_order = Input(shape=(1,), name='user_vertex_high_order_input')  # shape=(?,1)
+    user_context_high_order = Input(shape=(1,), name='user_context_high_order_input')  # shape=(?,1)
+    item_vertex_high_order = Input(shape=(1,), name='item_vertex_high_order_input')  # shape=(?,1)
+    item_context_high_order = Input(shape=(1,), name='item_context_high_order_input')  # shape=(?,1)
 
-    user_emb = Embedding(num_users, embedding_size, name='user_emb', embeddings_initializer=initializers.RandomUniform(minval=-1, maxval=1, seed=None))
-    item_emb = Embedding(num_items, embedding_size, name='item_emb', embeddings_initializer=initializers.RandomUniform(minval=-1, maxval=1, seed=None))
-    # context_user_emb = Embedding(num_users, embedding_size, name='context_user_emb')
-    # context_item_emb = Embedding(num_items, embedding_size, name='context_item_emb')
+    user_emb = Embedding(num_users, embedding_size, name='user_emb')
+    item_emb = Embedding(num_items, embedding_size, name='item_emb')
+    context_user_emb = Embedding(num_users, embedding_size, name='context_user_emb')
+    context_item_emb = Embedding(num_items, embedding_size, name='context_item_emb')
 
     user_direct_emb = user_emb(user_direct)  # shape=(?,1,1024)
     item_direct_emb = item_emb(item_direct)  # shape=(?,1,1024)
-    # user_vertex_high_order_emb = user_emb(user_vertex_high_order)  # shape=(?,1,1024)
-    # user_context_high_order_emb = context_user_emb(user_context_high_order)  # shape=(?,1,1024)
-    # item_vertex_high_order_emb = item_emb(item_vertex_high_order)  # shape=(?,1,1024)
-    # item_context_high_order_emb = context_item_emb(item_context_high_order)  # shape=(?,1,1024)
+    user_vertex_high_order_emb = user_emb(user_vertex_high_order)  # shape=(?,1,1024)
+    user_context_high_order_emb = context_user_emb(user_context_high_order)  # shape=(?,1,1024)
+    item_vertex_high_order_emb = item_emb(item_vertex_high_order)  # shape=(?,1,1024)
+    item_context_high_order_emb = context_item_emb(item_context_high_order)  # shape=(?,1,1024)
 
     # Crucial to flatten an embedding vector!
     user_direct_latent = Flatten()(user_direct_emb)  # shape=(?,1024)
     item_direct_latent = Flatten()(item_direct_emb)  # shape=(?,1024)
-    # user_vertex_high_order_latent = Flatten()(user_vertex_high_order_emb)  # shape=(?,1024)
-    # user_context_high_order_latent = Flatten()(user_context_high_order_emb)  # shape=(?,1024)
-    # item_vertex_high_order_latent = Flatten()(item_vertex_high_order_emb)  # shape=(?,1024)
-    # item_context_high_order_latent = Flatten()(item_context_high_order_emb)  # shape=(?,1024)
+    user_vertex_high_order_latent = Flatten()(user_vertex_high_order_emb)  # shape=(?,1024)
+    user_context_high_order_latent = Flatten()(user_context_high_order_emb)  # shape=(?,1024)
+    item_vertex_high_order_latent = Flatten()(item_vertex_high_order_emb)  # shape=(?,1024)
+    item_context_high_order_latent = Flatten()(item_context_high_order_emb)  # shape=(?,1024)
 
     dots_direct = Lambda(lambda x: tf.reduce_sum(
         x[0] * x[1], axis=-1, keep_dims=False), name='dots')([user_direct_latent, item_direct_latent])  # shape=(?,)
     dots_direct_flatten = Flatten()(dots_direct)  # shape=(?,1)
-    result = tf.keras.activations.sigmoid(dots_direct_flatten)
+    dots_direct_sigmoid = tf.keras.activations.sigmoid(dots_direct_flatten)
 
-    # dots_user_high_order = Lambda(lambda x: tf.reduce_sum(
-    #     x[0] * x[1], axis=-1, keep_dims=False), name='dots')([user_vertex_high_order_latent,
-    #                                                           user_context_high_order_latent])  # shape=(?,)
-    # dots_user_high_order_flatten = Flatten()(dots_user_high_order)  # shape=(?,1)
-    # softmax_user_high_order = Softmax(axis=-1)(dots_user_high_order_flatten)
-    #
-    # dots_item_high_order = Lambda(lambda x: tf.reduce_sum(
-    #     x[0] * x[1], axis=-1, keep_dims=False), name='dots')([item_vertex_high_order_latent,
-    #                                                           item_context_high_order_latent])  # shape=(?,)
-    # dots_item_high_order_flatten = Flatten()(dots_item_high_order)  # shape=(?,1)
-    # softmax_item_high_order = Softmax(axis=-1)(dots_item_high_order_flatten)
-    #
-    model_direct = Model(inputs=[user_direct, item_direct], outputs=[result])
-    # model_user_high_order = Model(inputs=[user_vertex_high_order, user_context_high_order],
-    #                               outputs=[softmax_user_high_order])
-    # model_item_high_order = Model(inputs=[item_vertex_high_order, item_context_high_order],
-    #                               outputs=[softmax_item_high_order])
+    dots_user_high_order = Lambda(lambda x: tf.reduce_sum(
+        x[0] * x[1], axis=-1, keep_dims=False), name='dots')([user_vertex_high_order_latent,
+                                                              user_context_high_order_latent])  # shape=(?,)
+    dots_user_high_order_flatten = Flatten()(dots_user_high_order)  # shape=(?,1)
+    dots_user_high_order_sigmoid = tf.keras.activations.sigmoid(dots_user_high_order_flatten)
 
-    # return model_direct, model_user_high_order, model_item_high_order, {'user': user_emb, 'item': item_emb}
-    return model_direct, {'user': user_emb, 'item': item_emb}
+    dots_item_high_order = Lambda(lambda x: tf.reduce_sum(
+        x[0] * x[1], axis=-1, keep_dims=False), name='dots')([item_vertex_high_order_latent,
+                                                              item_context_high_order_latent])  # shape=(?,)
+    dots_item_high_order_flatten = Flatten()(dots_item_high_order)  # shape=(?,1)
+    dots_item_high_order_sigmoid = tf.keras.activations.sigmoid(dots_item_high_order_flatten)
+
+    model_direct = Model(inputs=[user_direct, item_direct], outputs=[dots_direct_sigmoid])
+    model_user_high_order = Model(inputs=[user_vertex_high_order, user_context_high_order],
+                                  outputs=[dots_user_high_order_sigmoid])
+    model_item_high_order = Model(inputs=[item_vertex_high_order, item_context_high_order],
+                                  outputs=[dots_item_high_order_sigmoid])
+
+    return model_direct, model_user_high_order, model_item_high_order, {'user': user_emb, 'item': item_emb}
 
 
 def graph_context_batch_iter(all_pairs, batch_size):
@@ -85,13 +84,6 @@ def graph_context_batch_iter(all_pairs, batch_size):
         labels = np.ones(batch_size, dtype=np.int32)
         batch[:, :] = all_pairs[batch_idx, :]
         yield batch, labels
-
-
-def negative_sample(true_class, num_classes):
-    while True:
-        sample = random.randint(0, num_classes-1)
-        if not sample == true_class:
-            return sample
 
 
 class CSE:
@@ -113,17 +105,19 @@ class CSE:
     def reset_model(self, opt='adam', learning_rate=0.025):
         # self.model_direct, self.model_user_high_order, self.model_item_high_order, self.embedding_dict = \
         #     create_model(self.num_users, self.num_items, self.embedding_size)
-        self.model_direct, self.embedding_dict = \
+        self.model_direct, self.model_user_high_order, self.model_item_high_order, self.embedding_dict = \
             create_model(self.num_users, self.num_items, self.embedding_size)
-        # self.model_direct.compile(opt, loss={'softmax': 'binary_crossentropy'},
-        #                    loss_weights={'softmax': 1.})
-        self.model_direct.compile(optimizer=Adam(lr=learning_rate), loss={'tf_op_layer_Sigmoid': 'binary_crossentropy'},
-                                  loss_weights={'tf_op_layer_Sigmoid': 1.})
-        # self.model_user_high_order.compile(opt, loss={'softmax_1': 'binary_crossentropy'},
-        #                    loss_weights={'softmax_1': 0.05})
-        # self.model_item_high_order.compile(opt, loss={'softmax_2': 'binary_crossentropy'},
-        #                                    loss_weights={'softmax_2': 0.05})
+        # self.model_direct.compile(optimizer=Adam(lr=learning_rate), loss={'tf_op_layer_Sigmoid': 'binary_crossentropy'},
+        #                           loss_weights={'tf_op_layer_Sigmoid': 1.})
+        self.model_direct.compile(opt, loss={'tf_op_layer_Sigmoid': 'binary_crossentropy'},
+                           loss_weights={'tf_op_layer_Sigmoid': 1.})
+        # self.model_user_high_order.compile(opt, loss={'tf_op_layer_Sigmoid_1': 'binary_crossentropy'},
+        #                    loss_weights={'tf_op_layer_Sigmoid_1': 0.05})
+        # self.model_item_high_order.compile(opt, loss={'tf_op_layer_Sigmoid_2': 'binary_crossentropy'},
+        #                                    loss_weights={'tf_op_layer_Sigmoid_2': 0.05})
         self.batch_it = self.batch_iter()
+        # self.batch_it_user_high_order = self.batch_iter_user_high_order()
+        # self.batch_it_item_high_order = self.batch_iter_item_high_order()
 
     def _gen_sampling_table(self):
         self.all_pairs = np.loadtxt(self.data_path + 'user_adjacency_list.csv', dtype=np.int32, delimiter=' ')
@@ -171,7 +165,7 @@ class CSE:
                 negative_labels = np.zeros(self.batch_size, dtype=np.int32)
                 negative_batch[:, :2] = batch_features[:, :2]
                 for i in range(self.batch_size):
-                    negative_batch[i, 1] = negative_sample(true_class=batch_features[i, 1], num_classes=self.num_items)
+                    negative_batch[i, 1] = alias_sample(self.item_accept, self.item_alias)
                 yield ([negative_batch[:, 0], negative_batch[:, 1]], negative_labels)
 
     def reset_training_config(self, batch_size, times):
