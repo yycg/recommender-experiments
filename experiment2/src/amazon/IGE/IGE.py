@@ -47,12 +47,10 @@ class IGE:
 
         dots = Lambda(lambda x: tf.reduce_sum(
             x[0] * x[1], axis=-1, keep_dims=False), name='dots')([vector, output_item_latent])  # shape=(?,)
-
         vector = Flatten()(dots)  # shape=(?,1)
+        sigmoid = tf.keras.activations.sigmoid(vector)
 
-        softmax = Softmax(axis=-1)(vector)
-
-        model = Model(inputs=[u, v_i, v_j], outputs=softmax)
+        model = Model(inputs=[u, v_i, v_j], outputs=sigmoid)
 
         return model, {'user': user_emb, 'item': item_emb}
 
@@ -138,9 +136,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='manual to this script')
     parser.add_argument("--num_users", type=int, default=2558)
     parser.add_argument("--num_items", type=int, default=4091)
-    parser.add_argument("--embedding_size", type=int, default=1024)
+    parser.add_argument("--embedding_size", type=int, default=64)
     parser.add_argument("--data_path", type=str, default='../../../data/amazon/')
-    parser.add_argument("--epochs", type=int, default=3)
+    parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--edge_size", type=int, default=12640)
     parser.add_argument("--negative_ratio", type=int, default=5)
     args = parser.parse_args()
