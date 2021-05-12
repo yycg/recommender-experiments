@@ -355,23 +355,23 @@ class CSE:
         # self.reset_training_config(batch_size, times)
         for i in range(self.epochs - initial_epoch):
             with elapsed_timer("-- {0}s - %s" % ("train model_direct",)):
-                self.model_direct.fit_generator(self.batch_it, epochs=i+1, initial_epoch=i,
+                self.model_direct.fit_generator(self.batch_it, epochs=initial_epoch+i+1, initial_epoch=initial_epoch+i,
                                                 steps_per_epoch=self.steps_per_epoch, verbose=verbose)
             with elapsed_timer("-- {0}s - %s" % ("train model_user_user_high_order",)):
                 self.model_user_user_high_order.fit_generator(
-                    self.batch_it_user_user_high_order, epochs=i+1, initial_epoch=i,
+                    self.batch_it_user_user_high_order, epochs=initial_epoch+i+1, initial_epoch=initial_epoch+i,
                     steps_per_epoch=self.steps_per_epoch * ((self.walk_steps+1)//2), verbose=verbose)
             with elapsed_timer("-- {0}s - %s" % ("train model_item_item_high_order",)):
                 self.model_item_item_high_order.fit_generator(
-                    self.batch_it_item_item_high_order, epochs=i+1, initial_epoch=i,
+                    self.batch_it_item_item_high_order, epochs=initial_epoch+i+1, initial_epoch=initial_epoch+i,
                     steps_per_epoch=self.steps_per_epoch * ((self.walk_steps+1)//2), verbose=verbose)
             with elapsed_timer("-- {0}s - %s" % ("train model_user_item_high_order",)):
                 self.model_user_item_high_order.fit_generator(
-                    self.batch_it_user_item_high_order, epochs=i+1, initial_epoch=i,
+                    self.batch_it_user_item_high_order, epochs=initial_epoch+i+1, initial_epoch=initial_epoch+i,
                     steps_per_epoch=self.steps_per_epoch * (self.walk_steps//2), verbose=verbose)
             with elapsed_timer("-- {0}s - %s" % ("train model_item_user_high_order",)):
                 self.model_item_user_high_order.fit_generator(
-                    self.batch_it_item_user_high_order, epochs=i+1, initial_epoch=i,
+                    self.batch_it_item_user_high_order, epochs=initial_epoch+i+1, initial_epoch=initial_epoch+i,
                     steps_per_epoch=self.steps_per_epoch * (self.walk_steps//2), verbose=verbose)
 
     def get_embeddings(self,):
