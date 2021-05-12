@@ -7,9 +7,13 @@ import random
 import os
 
 
-class IGE:
+class CIGE:
+    """1. induced from attr
+       2. attr attention
+       3. high order
+    """
     def __init__(self, num_users, num_items, embedding_size, data_path, epochs, sample_size, sample_size_item,
-                 negative_ratio, batch_size=1024, times=1):
+                 sample_size_attr, negative_ratio, num_attributes, batch_size=1024, times=1):
         self.num_users = num_users
         self.num_items = num_items
         self.embedding_size = embedding_size
@@ -17,14 +21,17 @@ class IGE:
         self.epochs = epochs
         self.sample_size = sample_size
         self.sample_size_item = sample_size_item
+        self.sample_size_attr = sample_size_attr
         self.negative_ratio = negative_ratio
         self.samples_per_epoch = self.sample_size * (1 + negative_ratio)
         self.samples_per_epoch_item = self.sample_size_item * (1 + negative_ratio)
+        self.samples_per_epoch_attr = [s * (1 + negative_ratio) for s in self.sample_size_attr]
+        self.num_attributes = num_attributes
 
         self.reset_training_config(batch_size, times)
         self.reset_model()
 
-    def create_model(self, num_users, num_items, embedding_size):
+    def create_model(self, num_users, num_items, embedding_size, num_attributes):
         """Reference: Tensorflow Word2Vec tutorial
         https://www.tensorflow.org/tutorials/text/word2vec
         """
@@ -33,22 +40,38 @@ class IGE:
         user_context = Input(shape=(1,), name='user_context')  # shape=(?,1)
         item_vertex = Input(shape=(1,), name='item_vertex')  # shape=(?,1)
         item_context = Input(shape=(1,), name='item_context')  # shape=(?,1)
+        attr_vertex_list = []
+        for i in range(len(num_attributes)):
+            attr_vertex = Input(shape=(1,), name='attr_vertex_'+str(i))  # shape=(?,1)
+            attr_vertex_list.append(attr_vertex)
 
         user_emb = Embedding(num_users, embedding_size, name='user_emb')
         item_emb = Embedding(num_items, embedding_size, name='item_emb')
         context_user_emb = Embedding(num_users, embedding_size * 2, name='context_user_emb')
         context_item_emb = Embedding(num_items, embedding_size * 2, name='context_item_emb')
+        attr_emb_list = []
+        for i, num in enumerate(num_attributes):
+            attr_emb = Embedding(num, embedding_size, name='attr_emb_'+str(i))
+            attr_emb_list.append(attr_emb)
 
         user_vertex_emb = user_emb(user_vertex)  # shape=(?,1,1024)
         item_vertex_emb = item_emb(item_vertex)  # shape=(?,1,1024)
         user_context_emb = context_user_emb(user_context)  # shape=(?,1,2048)
         item_context_emb = context_item_emb(item_context)  # shape=(?,1,2048)
+        attr_vertex_emb_list = []
+        for i in range(len(num_attributes)):
+            attr_vertex_emb = attr_emb_list[i](attr_vertex_list[i])  # shape=(?,1,1024)
+            attr_vertex_emb_list.append(attr_vertex_emb)
 
         # Crucial to flatten an embedding vector!
         user_vertex_latent = Flatten()(user_vertex_emb)  # shape=(?,1024)
         item_vertex_latent = Flatten()(item_vertex_emb)  # shape=(?,1024)
         user_context_latent = Flatten()(user_context_emb)  # shape=(?,2048)
         item_context_latent = Flatten()(item_context_emb)  # shape=(?,2048)
+        attr_vertex_latent_list = []
+        for attr_vertex_emb in attr_vertex_emb_list:
+            attr_vertex_latent = Flatten()(attr_vertex_emb)
+            attr_vertex_latent_list.append(attr_vertex_latent)
 
         vector = Concatenate()([user_vertex_latent, item_vertex_latent])  # shape=(?,2048)
         dots = Lambda(lambda x: tf.reduce_sum(
@@ -62,10 +85,23 @@ class IGE:
         vector_item = Flatten()(dots_item)  # shape=(?,1)
         sigmoid_item = tf.keras.activations.sigmoid(vector_item)
 
+        sigmoid_attr_list = []
+        for attr_vertex_latent in attr_vertex_latent_list:
+            vector_attr = Concatenate()([attr_vertex_latent, item_vertex_latent])  # shape=(?,2048)
+            dots_attr = Lambda(lambda x: tf.reduce_sum(
+                x[0] * x[1], axis=-1, keep_dims=False), name='dots')([vector_attr, item_context_latent])  # shape=(?,)
+            vector_attr = Flatten()(dots_attr)  # shape=(?,1)
+            sigmoid_attr = tf.keras.activations.sigmoid(vector_attr)
+            sigmoid_attr_list.append(sigmoid_attr)
+
         model = Model(inputs=[user_vertex, item_vertex, item_context], outputs=sigmoid)
         model_item = Model(inputs=[item_vertex, user_vertex, user_context], outputs=sigmoid_item)
+        model_attr_list = []
+        for i in range(len(num_attributes)):
+            model_attr = Model(inputs=[attr_vertex_list[i], item_vertex, item_context], outputs=sigmoid_attr_list[i])
+            model_attr_list.append(model_attr)
 
-        return model, model_item, {'user': user_emb, 'item': item_emb}
+        return model, model_item, model_attr_list, {'user': user_emb, 'item': item_emb}
 
     def graph_context_batch_iter(self, s_u, batch_size):
         while True:
@@ -78,12 +114,19 @@ class IGE:
             yield batch, labels
 
     def reset_model(self, opt='adam'):
-        self.model, self.model_item, self.embedding_dict = \
-            self.create_model(self.num_users, self.num_items, self.embedding_size)
-        self.model.compile(opt, loss='binary_crossentropy')
-        self.model_item.compile(opt, loss='binary_crossentropy')
+        self.model, self.model_item, self.model_attr_list, self.embedding_dict = \
+            self.create_model(self.num_users, self.num_items, self.embedding_size, self.num_attributes)
+        self.model.compile(opt, loss={'tf_op_layer_Sigmoid': 'binary_crossentropy'},
+                           loss_weights={'tf_op_layer_Sigmoid': 1.})
+        self.model_item.compile(opt, loss={'tf_op_layer_Sigmoid_1': 'binary_crossentropy'},
+                                loss_weights={'tf_op_layer_Sigmoid_1': 1.})
+        attr_loss_weights = [0.05]
+        for i in range(len(self.model_attr_list)):
+            self.model_attr_list[i].compile(opt, loss={'tf_op_layer_Sigmoid_'+str(i+2): 'binary_crossentropy'},
+                                                 loss_weights={'tf_op_layer_Sigmoid_'+str(i+2): attr_loss_weights[i]})
         self.batch_it = self.batch_iter()
         self.batch_it_item = self.batch_iter_item()
+        self.batch_its_attr = [self.batch_iter_attr()]
 
     def batch_iter(self):
         """fit_generator
@@ -126,6 +169,24 @@ class IGE:
                 yield ([negative_batch[:, 0], negative_batch[:, 1], negative_batch[:, 2]],
                        negative_labels)
 
+    def batch_iter_attr(self):
+        all_pairs = np.loadtxt(self.data_path + 's_a.csv', dtype=np.int32, delimiter=' ')
+        while True:
+            batch_features, batch_labels = next(self.graph_context_batch_iter(all_pairs, self.batch_size))
+            yield ([batch_features[:, 0], batch_features[:, 1], batch_features[:, 2]],
+                   batch_labels)  # (1024,)
+
+            # negative sample
+            for _ in range(self.negative_ratio):
+                negative_batch = np.zeros((self.batch_size, 3), dtype=np.int32)
+                negative_labels = np.zeros(self.batch_size, dtype=np.int32)
+                negative_batch[:, :2] = batch_features[:, :2]
+                for i in range(self.batch_size):
+                    negative_batch[i, 2] = self._negative_sample(true_class=batch_features[i, 2],
+                                                                 num_classes=self.num_attributes[0])
+                yield ([negative_batch[:, 0], negative_batch[:, 1], negative_batch[:, 2]],
+                       negative_labels)
+    
     def _negative_sample(self, true_class, num_classes):
         while True:
             sample = random.randint(0, num_classes-1)
@@ -138,6 +199,8 @@ class IGE:
             (self.samples_per_epoch - 1) // self.batch_size + 1)*times
         self.steps_per_epoch_item = (
              (self.samples_per_epoch_item - 1) // self.batch_size + 1) * times
+        self.steps_per_epoch_attr = [(
+             (s - 1) // self.batch_size + 1) * times for s in self.samples_per_epoch_attr]
 
     def train(self, batch_size=1024, epochs=1, initial_epoch=0, verbose=1, times=1):
         # self.reset_training_config(batch_size, times)
@@ -146,6 +209,11 @@ class IGE:
                                      steps_per_epoch=self.steps_per_epoch, verbose=verbose)
             self.model_item.fit_generator(self.batch_it_item, epochs=initial_epoch+i+1, initial_epoch=initial_epoch+i,
                                           steps_per_epoch=self.steps_per_epoch_item, verbose=verbose)
+            for j in range(len(self.model_attr_list)):
+                model_attr = self.model_attr_list[j]
+                batch_it_attr = self.batch_its_attr[j]
+                model_attr.fit_generator(batch_it_attr, epochs=initial_epoch+i+1, initial_epoch=initial_epoch+i,
+                                         steps_per_epoch=self.steps_per_epoch_attr[j], verbose=verbose)
 
     def get_embeddings(self,):
         user_embeddings = self.embedding_dict['user'].get_weights()[0]
@@ -179,11 +247,15 @@ if __name__ == '__main__':
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--sample_size", type=int, default=12640)
     parser.add_argument("--sample_size_item", type=int, default=10566)
+    parser.add_argument("--sample_size_attr", nargs='?', default='[1514833]')
     parser.add_argument("--negative_ratio", type=int, default=5)
+    parser.add_argument("--num_attributes", nargs='?', default='[1739]')
     args = parser.parse_args()
 
-    model = IGE(args.num_users, args.num_items, args.embedding_size, args.data_path, args.epochs, args.sample_size,
-                args.sample_size_item, args.negative_ratio)
+    model = CIGE(num_users=args.num_users, num_items=args.num_items, embedding_size=args.embedding_size, 
+                 data_path=args.data_path, epochs=args.epochs, sample_size=args.sample_size,
+                 sample_size_item=args.sample_size_item, sample_size_attr=eval(args.sample_size_attr),
+                 negative_ratio=args.negative_ratio, num_attributes=eval(args.num_attributes))
     model.train()
     user_embeddings, item_embeddings = model.get_embeddings()
     output_embeddings(user_embeddings, item_embeddings)
