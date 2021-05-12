@@ -8,8 +8,29 @@ import argparse
 import random
 import os
 import math
+import contextlib
+import time
 
 from alias import create_alias_table, alias_sample
+
+
+class StubLogger(object):
+    def __getattr__(self, name):
+        return self.log_print
+
+    def log_print(self, msg, *args):
+        print(msg % args)
+
+
+LOGGER = StubLogger()
+LOGGER.info("Hello %s!", "world")
+
+
+@contextlib.contextmanager
+def elapsed_timer(message):
+    start_time = time.time()
+    yield
+    LOGGER.info(message.format(time.time() - start_time))
 
 
 def create_model(num_users, num_items, embedding_size):
@@ -54,25 +75,42 @@ def create_model(num_users, num_items, embedding_size):
     dots_direct_flatten = Flatten()(dots_direct)  # shape=(?,1)
     dots_direct_sigmoid = tf.keras.activations.sigmoid(dots_direct_flatten)
 
-    dots_user_high_order = Lambda(lambda x: tf.reduce_sum(
+    dots_user_user_high_order = Lambda(lambda x: tf.reduce_sum(
         x[0] * x[1], axis=-1, keep_dims=False), name='dots')([user_vertex_high_order_latent,
                                                               user_context_high_order_latent])  # shape=(?,)
-    dots_user_high_order_flatten = Flatten()(dots_user_high_order)  # shape=(?,1)
-    dots_user_high_order_sigmoid = tf.keras.activations.sigmoid(dots_user_high_order_flatten)
+    dots_user_user_high_order_flatten = Flatten()(dots_user_user_high_order)  # shape=(?,1)
+    dots_user_user_high_order_sigmoid = tf.keras.activations.sigmoid(dots_user_user_high_order_flatten)
 
-    dots_item_high_order = Lambda(lambda x: tf.reduce_sum(
+    dots_item_item_high_order = Lambda(lambda x: tf.reduce_sum(
         x[0] * x[1], axis=-1, keep_dims=False), name='dots')([item_vertex_high_order_latent,
                                                               item_context_high_order_latent])  # shape=(?,)
-    dots_item_high_order_flatten = Flatten()(dots_item_high_order)  # shape=(?,1)
-    dots_item_high_order_sigmoid = tf.keras.activations.sigmoid(dots_item_high_order_flatten)
+    dots_item_item_high_order_flatten = Flatten()(dots_item_item_high_order)  # shape=(?,1)
+    dots_item_item_high_order_sigmoid = tf.keras.activations.sigmoid(dots_item_item_high_order_flatten)
+
+    dots_user_item_high_order = Lambda(lambda x: tf.reduce_sum(
+        x[0] * x[1], axis=-1, keep_dims=False), name='dots')([user_vertex_high_order_latent,
+                                                              item_context_high_order_latent])  # shape=(?,)
+    dots_user_item_high_order_flatten = Flatten()(dots_user_item_high_order)  # shape=(?,1)
+    dots_user_item_high_order_sigmoid = tf.keras.activations.sigmoid(dots_user_item_high_order_flatten)
+
+    dots_item_user_high_order = Lambda(lambda x: tf.reduce_sum(
+        x[0] * x[1], axis=-1, keep_dims=False), name='dots')([item_vertex_high_order_latent,
+                                                              user_context_high_order_latent])  # shape=(?,)
+    dots_item_user_high_order_flatten = Flatten()(dots_item_user_high_order)  # shape=(?,1)
+    dots_item_user_high_order_sigmoid = tf.keras.activations.sigmoid(dots_item_user_high_order_flatten)
 
     model_direct = Model(inputs=[user_direct, item_direct], outputs=[dots_direct_sigmoid])
-    model_user_high_order = Model(inputs=[user_vertex_high_order, user_context_high_order],
-                                  outputs=[dots_user_high_order_sigmoid])
-    model_item_high_order = Model(inputs=[item_vertex_high_order, item_context_high_order],
-                                  outputs=[dots_item_high_order_sigmoid])
+    model_user_user_high_order = Model(inputs=[user_vertex_high_order, user_context_high_order],
+                                       outputs=[dots_user_user_high_order_sigmoid])
+    model_item_item_high_order = Model(inputs=[item_vertex_high_order, item_context_high_order],
+                                       outputs=[dots_item_item_high_order_sigmoid])
+    model_user_item_high_order = Model(inputs=[user_vertex_high_order, item_context_high_order],
+                                       outputs=[dots_user_item_high_order_sigmoid])
+    model_item_user_high_order = Model(inputs=[item_vertex_high_order, user_context_high_order],
+                                       outputs=[dots_item_user_high_order_sigmoid])
 
-    return model_direct, model_user_high_order, model_item_high_order, {'user': user_emb, 'item': item_emb}
+    return model_direct, model_user_user_high_order, model_item_item_high_order, \
+           model_user_item_high_order, model_item_user_high_order, {'user': user_emb, 'item': item_emb}
 
 
 def graph_context_batch_iter(all_pairs, batch_size):
@@ -87,7 +125,7 @@ def graph_context_batch_iter(all_pairs, batch_size):
 
 
 class CSE:
-    def __init__(self, num_users, num_items, embedding_size, data_path, epochs, edge_size, negative_ratio,
+    def __init__(self, num_users, num_items, embedding_size, data_path, epochs, edge_size, negative_ratio, walk_steps,
                  batch_size=1024, times=1):
         self.num_users = num_users
         self.num_items = num_items
@@ -97,31 +135,52 @@ class CSE:
         self.edge_size = edge_size
         self.negative_ratio = negative_ratio
         self.samples_per_epoch = self.edge_size * (1 + negative_ratio)
+        self.walk_steps = walk_steps
 
+        self.prepare_adjacency_list()
         self._gen_sampling_table()
         self.reset_training_config(batch_size, times)
         self.reset_model()
 
+    def prepare_adjacency_list(self):
+        self.all_pairs = np.loadtxt(self.data_path + 'user_adjacency_list.csv', dtype=np.int32, delimiter=' ')
+
+        self.user_items_map = {}
+        self.item_users_map = {}
+        for i in range(len(self.all_pairs)):
+            user = self.all_pairs[i][0]
+            item = self.all_pairs[i][1]
+            self.user_items_map.setdefault(user, [])
+            self.user_items_map[user].append(item)
+            self.item_users_map.setdefault(item, [])
+            self.item_users_map[item].append(user)
+
     def reset_model(self, opt='adam', learning_rate=0.025):
         # self.model_direct, self.model_user_high_order, self.model_item_high_order, self.embedding_dict = \
         #     create_model(self.num_users, self.num_items, self.embedding_size)
-        self.model_direct, self.model_user_high_order, self.model_item_high_order, self.embedding_dict = \
+        self.model_direct, self.model_user_user_high_order, self.model_item_item_high_order, \
+            self.model_user_item_high_order, self.model_item_user_high_order, self.embedding_dict = \
             create_model(self.num_users, self.num_items, self.embedding_size)
         # self.model_direct.compile(optimizer=Adam(lr=learning_rate), loss={'tf_op_layer_Sigmoid': 'binary_crossentropy'},
         #                           loss_weights={'tf_op_layer_Sigmoid': 1.})
         self.model_direct.compile(opt, loss={'tf_op_layer_Sigmoid': 'binary_crossentropy'},
-                           loss_weights={'tf_op_layer_Sigmoid': 1.})
-        # self.model_user_high_order.compile(opt, loss={'tf_op_layer_Sigmoid_1': 'binary_crossentropy'},
-        #                    loss_weights={'tf_op_layer_Sigmoid_1': 0.05})
-        # self.model_item_high_order.compile(opt, loss={'tf_op_layer_Sigmoid_2': 'binary_crossentropy'},
-        #                                    loss_weights={'tf_op_layer_Sigmoid_2': 0.05})
+                                  loss_weights={'tf_op_layer_Sigmoid': 1.})
+        self.model_user_user_high_order.compile(opt, loss={'tf_op_layer_Sigmoid_1': 'binary_crossentropy'},
+                                           loss_weights={'tf_op_layer_Sigmoid_1': 0.05})
+        self.model_item_item_high_order.compile(opt, loss={'tf_op_layer_Sigmoid_2': 'binary_crossentropy'},
+                                           loss_weights={'tf_op_layer_Sigmoid_2': 0.05})
+        self.model_user_item_high_order.compile(opt, loss={'tf_op_layer_Sigmoid_3': 'binary_crossentropy'},
+                                                loss_weights={'tf_op_layer_Sigmoid_3': 0.05})
+        self.model_item_user_high_order.compile(opt, loss={'tf_op_layer_Sigmoid_4': 'binary_crossentropy'},
+                                                loss_weights={'tf_op_layer_Sigmoid_4': 0.05})
+        self.batch_buffer = {'user_user': [], 'item_item': [], 'user_item': [], 'item_user': []}
         self.batch_it = self.batch_iter()
-        # self.batch_it_user_high_order = self.batch_iter_user_high_order()
-        # self.batch_it_item_high_order = self.batch_iter_item_high_order()
+        self.batch_it_user_user_high_order = self.batch_iter_user_user_high_order()
+        self.batch_it_item_item_high_order = self.batch_iter_item_item_high_order()
+        self.batch_it_user_item_high_order = self.batch_iter_user_item_high_order()
+        self.batch_it_item_user_high_order = self.batch_iter_item_user_high_order()
 
     def _gen_sampling_table(self):
-        self.all_pairs = np.loadtxt(self.data_path + 'user_adjacency_list.csv', dtype=np.int32, delimiter=' ')
-
         # create sampling table for user vertex
         power = 0.75
         user_degree = np.zeros(self.num_users)  # out degree
@@ -149,6 +208,12 @@ class CSE:
 
         self.item_accept, self.item_alias = create_alias_table(norm_prob)
 
+    def sample_context_from_user(self, user):
+        return random.choice(self.user_items_map[user])
+
+    def sample_context_from_item(self, item):
+        return random.choice(self.item_users_map[item])
+    
     def batch_iter(self):
         """fit_generator
             The generator is expected to loop over its data
@@ -163,10 +228,123 @@ class CSE:
             for _ in range(self.negative_ratio):
                 negative_batch = np.zeros((self.batch_size, 2), dtype=np.int32)
                 negative_labels = np.zeros(self.batch_size, dtype=np.int32)
-                negative_batch[:, :2] = batch_features[:, :2]
+                negative_batch[:, :1] = batch_features[:, :1]
                 for i in range(self.batch_size):
                     negative_batch[i, 1] = alias_sample(self.item_accept, self.item_alias)
                 yield ([negative_batch[:, 0], negative_batch[:, 1]], negative_labels)
+            
+            # walk from item
+            batch_features_copy = np.zeros((self.batch_size, 2), dtype=np.int32)
+            batch_features_copy[:, :] = batch_features[:, :]
+            for j in range(self.walk_steps):
+                if j % 2 == 0:  # (user, item->user)
+                    high_order_batch = np.zeros((self.batch_size, 2), dtype=np.int32)
+                    high_order_labels = np.ones(self.batch_size, dtype=np.int32)
+                    for i in range(self.batch_size):
+                        batch_features_copy[i, 1] = self.sample_context_from_item(batch_features_copy[i, 1])
+                    high_order_batch[:, :] = batch_features_copy[:, :]
+                    self.batch_buffer['user_user'].append(
+                        ([high_order_batch[:, 0], high_order_batch[:, 1]], high_order_labels))
+                
+                    # negative sample
+                    for _ in range(self.negative_ratio):
+                        negative_batch = np.zeros((self.batch_size, 2), dtype=np.int32)
+                        negative_labels = np.zeros(self.batch_size, dtype=np.int32)
+                        negative_batch[:, :1] = batch_features_copy[:, :1]
+                        for i in range(self.batch_size):
+                            negative_batch[i, 1] = alias_sample(self.user_accept, self.user_alias)
+                        self.batch_buffer['user_user'].append(
+                            ([negative_batch[:, 0], negative_batch[:, 1]], negative_labels))
+                
+                else:  # (user, user->item)
+                    high_order_batch = np.zeros((self.batch_size, 2), dtype=np.int32)
+                    high_order_labels = np.ones(self.batch_size, dtype=np.int32)
+                    for i in range(self.batch_size):
+                        batch_features_copy[i, 1] = self.sample_context_from_user(batch_features_copy[i, 1])
+                    high_order_batch[:, :] = batch_features_copy[:, :]
+                    self.batch_buffer['user_item'].append(
+                        ([high_order_batch[:, 0], high_order_batch[:, 1]], high_order_labels))
+                
+                    # negative sample
+                    for _ in range(self.negative_ratio):
+                        negative_batch = np.zeros((self.batch_size, 2), dtype=np.int32)
+                        negative_labels = np.zeros(self.batch_size, dtype=np.int32)
+                        negative_batch[:, :1] = batch_features_copy[:, :1]
+                        for i in range(self.batch_size):
+                            negative_batch[i, 1] = alias_sample(self.item_accept, self.item_alias)
+                        self.batch_buffer['user_item'].append(
+                            ([negative_batch[:, 0], negative_batch[:, 1]], negative_labels))
+
+            # walk from user
+            batch_features_copy = np.zeros((self.batch_size, 2), dtype=np.int32)
+            batch_features_copy[:, 0] = batch_features[:, 1]
+            batch_features_copy[:, 1] = batch_features[:, 0]
+            for j in range(self.walk_steps):
+                if j % 2 == 0:  # (item, user->item)
+                    high_order_batch = np.zeros((self.batch_size, 2), dtype=np.int32)
+                    high_order_labels = np.ones(self.batch_size, dtype=np.int32)
+                    for i in range(self.batch_size):
+                        batch_features_copy[i, 1] = self.sample_context_from_user(batch_features_copy[i, 1])
+                    high_order_batch[:, :] = batch_features_copy[:, :]
+                    self.batch_buffer['item_item'].append(
+                        ([high_order_batch[:, 0], high_order_batch[:, 1]], high_order_labels))
+                
+                    # negative sample
+                    for _ in range(self.negative_ratio):
+                        negative_batch = np.zeros((self.batch_size, 2), dtype=np.int32)
+                        negative_labels = np.zeros(self.batch_size, dtype=np.int32)
+                        negative_batch[:, :1] = batch_features_copy[:, :1]
+                        for i in range(self.batch_size):
+                            negative_batch[i, 1] = alias_sample(self.item_accept, self.item_alias)
+                        self.batch_buffer['item_item'].append(
+                            ([negative_batch[:, 0], negative_batch[:, 1]], negative_labels))
+                
+                else:  # (item, item->user)
+                    high_order_batch = np.zeros((self.batch_size, 2), dtype=np.int32)
+                    high_order_labels = np.ones(self.batch_size, dtype=np.int32)
+                    for i in range(self.batch_size):
+                        batch_features_copy[i, 1] = self.sample_context_from_item(batch_features_copy[i, 1])
+                    high_order_batch[:, :] = batch_features_copy[:, :]
+                    self.batch_buffer['item_user'].append(
+                        ([high_order_batch[:, 0], high_order_batch[:, 1]], high_order_labels))
+                
+                    # negative sample
+                    for _ in range(self.negative_ratio):
+                        negative_batch = np.zeros((self.batch_size, 2), dtype=np.int32)
+                        negative_labels = np.zeros(self.batch_size, dtype=np.int32)
+                        negative_batch[:, :1] = batch_features_copy[:, :1]
+                        for i in range(self.batch_size):
+                            negative_batch[i, 1] = alias_sample(self.user_accept, self.user_alias)
+                        self.batch_buffer['item_user'].append(
+                            ([negative_batch[:, 0], negative_batch[:, 1]], negative_labels))
+
+    def batch_iter_user_user_high_order(self):
+        while True:
+            buffer = self.batch_buffer['user_user'][:]
+            self.batch_buffer['user_user'].clear()
+            for i in range(len(buffer)):
+                yield buffer[i]
+
+    def batch_iter_item_item_high_order(self):
+        while True:
+            buffer = self.batch_buffer['item_item'][:]
+            self.batch_buffer['item_item'].clear()
+            for i in range(len(buffer)):
+                yield buffer[i]
+
+    def batch_iter_user_item_high_order(self):
+        while True:
+            buffer = self.batch_buffer['user_item'][:]
+            self.batch_buffer['user_item'].clear()
+            for i in range(len(buffer)):
+                yield buffer[i]
+
+    def batch_iter_item_user_high_order(self):
+        while True:
+            buffer = self.batch_buffer['item_user'][:]
+            self.batch_buffer['item_user'].clear()
+            for i in range(len(buffer)):
+                yield buffer[i]
 
     def reset_training_config(self, batch_size, times):
         self.batch_size = batch_size
@@ -175,10 +353,26 @@ class CSE:
 
     def train(self, batch_size=1024, epochs=1, initial_epoch=0, verbose=1, times=1):
         # self.reset_training_config(batch_size, times)
-        hist = self.model_direct.fit_generator(self.batch_it, epochs=self.epochs, initial_epoch=initial_epoch,
-                                        steps_per_epoch=self.steps_per_epoch,
-                                        verbose=verbose)
-        return hist
+        for i in range(self.epochs - initial_epoch):
+            with elapsed_timer("-- {0}s - %s" % ("train model_direct",)):
+                self.model_direct.fit_generator(self.batch_it, epochs=i+1, initial_epoch=i,
+                                                steps_per_epoch=self.steps_per_epoch, verbose=verbose)
+            with elapsed_timer("-- {0}s - %s" % ("train model_user_user_high_order",)):
+                self.model_user_user_high_order.fit_generator(
+                    self.batch_it_user_user_high_order, epochs=i+1, initial_epoch=i,
+                    steps_per_epoch=self.steps_per_epoch * ((self.walk_steps+1)//2), verbose=verbose)
+            with elapsed_timer("-- {0}s - %s" % ("train model_item_item_high_order",)):
+                self.model_item_item_high_order.fit_generator(
+                    self.batch_it_item_item_high_order, epochs=i+1, initial_epoch=i,
+                    steps_per_epoch=self.steps_per_epoch * ((self.walk_steps+1)//2), verbose=verbose)
+            with elapsed_timer("-- {0}s - %s" % ("train model_user_item_high_order",)):
+                self.model_user_item_high_order.fit_generator(
+                    self.batch_it_user_item_high_order, epochs=i+1, initial_epoch=i,
+                    steps_per_epoch=self.steps_per_epoch * (self.walk_steps//2), verbose=verbose)
+            with elapsed_timer("-- {0}s - %s" % ("train model_item_user_high_order",)):
+                self.model_item_user_high_order.fit_generator(
+                    self.batch_it_item_user_high_order, epochs=i+1, initial_epoch=i,
+                    steps_per_epoch=self.steps_per_epoch * (self.walk_steps//2), verbose=verbose)
 
     def get_embeddings(self,):
         user_embeddings = self.embedding_dict['user'].get_weights()[0]
@@ -212,10 +406,11 @@ if __name__ == '__main__':
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--edge_size", type=int, default=5126)
     parser.add_argument("--negative_ratio", type=int, default=5)
+    parser.add_argument("--walk_steps", type=int, default=5)
     args = parser.parse_args()
 
     model = CSE(args.num_users, args.num_items, args.embedding_size, args.data_path, args.epochs, args.edge_size,
-                args.negative_ratio)
+                args.negative_ratio, args.walk_steps)
     model.train()
     user_embeddings, item_embeddings = model.get_embeddings()
     output_embeddings(user_embeddings, item_embeddings)
