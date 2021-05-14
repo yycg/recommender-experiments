@@ -314,7 +314,7 @@ def _recommend(user_set, cand_set, word_vectors, data_path, recommend_file):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='manual to this script')
-    parser.add_argument("--data_path", type=str, default='/home/sjy2018/Amazon/')
+    parser.add_argument("--data_path", type=str, default='D:/Developer/Amazon/')
     parser.add_argument("--p", type=float, default=0.25)
     parser.add_argument("--q", type=float, default=2)
     parser.add_argument("--num_walks", type=int, default=10)
