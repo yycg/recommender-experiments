@@ -12,7 +12,8 @@ from utils import partition_num
 
 
 class RandomWalker:
-    def __init__(self, G, item_side_info_map, p=1, q=1, use_rejection_sampling=0, use_random_leap=True, r=0.05):
+    def __init__(self, G, item_attr_map, attr_items_map, p=1, q=1, use_rejection_sampling=0,
+                 use_random_leap=True, r=0.05):
         """
         :param G:
         :param p: Return parameter,controls the likelihood of immediately revisiting a node in the walk.
@@ -24,7 +25,8 @@ class RandomWalker:
         self.q = q
         self.use_rejection_sampling = use_rejection_sampling
         self.use_random_leap = use_random_leap
-        self.item_side_info_map = item_side_info_map
+        self.item_attr_map = item_attr_map
+        self.attr_items_map = attr_items_map
         self.r = r
 
     def deepwalk_walk(self, walk_length, start_node):
@@ -62,13 +64,22 @@ class RandomWalker:
                     next_node = cur_nbrs[alias_sample(alias_edges[edge][0],
                                                       alias_edges[edge][1])]
                     walk.append(next_node)
+
                 prev = cur
                 cur = walk[-1]
 
                 # leap to item attribute
-                if cur in self.item_side_info_map and random.random() < self.r:
-                    brand = self.item_side_info_map[cur]
+                if cur in self.item_attr_map and random.random() < self.r:
+                    brand = self.item_attr_map[cur]
                     walk.append('brand' + brand)
+                    while True:
+                        item = random.choice(self.attr_items_map[brand])
+                        if self.G.has_node(item):
+                            walk.append(item)
+                            break
+
+                    prev = None
+                    cur = walk[-1]
             else:
                 break
 
