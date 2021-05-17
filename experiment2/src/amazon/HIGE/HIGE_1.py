@@ -7,14 +7,19 @@ import os
 from walker import RandomWalker
 
 
-class Node2Vec:
-
-    def __init__(self, graph, walk_length, num_walks, p=1.0, q=1.0, workers=1, use_rejection_sampling=0):
+class HIGE:
+    """1. node2vec hierarchy
+       2. node2vec attributes high-order
+       3. cold start
+    """
+    def __init__(self, graph, item_side_info_map, walk_length, num_walks, p=1.0, q=1.0, workers=1,
+                 use_rejection_sampling=0, use_random_leap=True, r=0.05):
 
         self.graph = graph
         self._embeddings = {}
         self.walker = RandomWalker(
-            graph, p=p, q=q, use_rejection_sampling=use_rejection_sampling)
+            graph, item_side_info_map=item_side_info_map, p=p, q=q, use_rejection_sampling=use_rejection_sampling,
+            use_random_leap=use_random_leap, r=r)
 
         print("Preprocess transition probs...")
         self.walker.preprocess_transition_probs()
@@ -74,8 +79,14 @@ if __name__ == "__main__":
     # 加create_using=nx.DiGraph()是有向图，不加是无向图
     G = nx.read_edgelist(os.path.join(args.data_path, 'net.txt'),
                          nodetype=None, data=[('weight', int)])
-    model = Node2Vec(G, walk_length=10, num_walks=80,
-                     p=0.25, q=4, workers=1, use_rejection_sampling=0)
+    sku_side_info = np.loadtxt(args.data_path + 'sku_side_info.csv', dtype=np.int32, delimiter='\t')
+    item_side_info_map = {}
+    for i in range(len(sku_side_info)):
+        item = sku_side_info[i][0]
+        side_info = sku_side_info[i][1]
+        item_side_info_map[str(item)] = str(side_info)
+    model = HIGE(G, item_side_info_map=item_side_info_map, walk_length=10, num_walks=80,
+                 p=0.25, q=4, workers=1, use_rejection_sampling=0, use_random_leap=True, r=0.5)
     model.train(window_size=5, iter=3)
     embeddings=model.get_embeddings()
     output_embeddings(embeddings)

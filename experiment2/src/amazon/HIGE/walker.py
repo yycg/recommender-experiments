@@ -12,7 +12,7 @@ from utils import partition_num
 
 
 class RandomWalker:
-    def __init__(self, G, p=1, q=1, use_rejection_sampling=0):
+    def __init__(self, G, item_side_info_map, p=1, q=1, use_rejection_sampling=0, use_random_leap=True, r=0.05):
         """
         :param G:
         :param p: Return parameter,controls the likelihood of immediately revisiting a node in the walk.
@@ -23,6 +23,9 @@ class RandomWalker:
         self.p = p
         self.q = q
         self.use_rejection_sampling = use_rejection_sampling
+        self.use_random_leap = use_random_leap
+        self.item_side_info_map = item_side_info_map
+        self.r = r
 
     def deepwalk_walk(self, walk_length, start_node):
 
@@ -35,6 +38,40 @@ class RandomWalker:
                 walk.append(random.choice(cur_nbrs))
             else:
                 break
+        return walk
+
+    def random_leap(self, walk_length, start_node):
+
+        G = self.G
+        alias_nodes = self.alias_nodes
+        alias_edges = self.alias_edges
+
+        walk = [start_node]
+        prev = None
+        cur = walk[0]
+
+        while len(walk) < walk_length:
+            # walk to user/item node
+            cur_nbrs = list(G.neighbors(cur))
+            if len(cur_nbrs) > 0:
+                if prev is None:
+                    walk.append(
+                        cur_nbrs[alias_sample(alias_nodes[cur][0], alias_nodes[cur][1])])
+                else:
+                    edge = (prev, cur)
+                    next_node = cur_nbrs[alias_sample(alias_edges[edge][0],
+                                                      alias_edges[edge][1])]
+                    walk.append(next_node)
+                prev = cur
+                cur = walk[-1]
+
+                # leap to item attribute
+                if cur in self.item_side_info_map and random.random() < self.r:
+                    brand = self.item_side_info_map[cur]
+                    walk.append('brand' + brand)
+            else:
+                break
+
         return walk
 
     def node2vec_walk(self, walk_length, start_node):
@@ -137,6 +174,9 @@ class RandomWalker:
             for v in nodes:
                 if self.p == 1 and self.q == 1:
                     walks.append(self.deepwalk_walk(
+                        walk_length=walk_length, start_node=v))
+                elif self.use_random_leap:
+                    walks.append(self.random_leap(
                         walk_length=walk_length, start_node=v))
                 elif self.use_rejection_sampling:
                     walks.append(self.node2vec_walk2(
