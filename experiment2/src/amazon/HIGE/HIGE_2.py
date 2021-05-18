@@ -1,5 +1,8 @@
+import json
+
 from gensim.models import Word2Vec
 import numpy as np
+import pandas as pd
 import argparse
 import networkx as nx
 import os
@@ -10,16 +13,20 @@ from walker import RandomWalker
 class HIGE:
     """1. node2vec hierarchy
        2. node2vec attributes high-order
-       3. cold start
+       3. attention, cold start
     """
-    def __init__(self, graph, item_attr_map, attr_items_map, walk_length, num_walks, p=1.0, q=1.0, workers=1,
-                 use_rejection_sampling=0, use_random_leap=True, r=0.05):
+    def __init__(self, graph, walk_length, num_walks, p=1.0, q=1.0, workers=1, use_rejection_sampling=0,
+                 use_random_leap=True, item_attr_map=None, attr_items_map=None, r=0.05,
+                 use_hierarchical_structure=False, item_categories_map=None,
+                 category_category_children_map=None, category_item_children_map=None, h=0.5, h2=0.5):
 
         self.graph = graph
         self._embeddings = {}
         self.walker = RandomWalker(
             graph, item_attr_map=item_attr_map, attr_items_map=attr_items_map, p=p, q=q,
-            use_rejection_sampling=use_rejection_sampling, use_random_leap=use_random_leap, r=r)
+            use_rejection_sampling=use_rejection_sampling, use_random_leap=use_random_leap, r=r, h=h, h2=h2,
+            item_categories_map=item_categories_map, category_category_children_map=category_category_children_map,
+            category_item_children_map=category_item_children_map, use_hierarchical_structure=use_hierarchical_structure)
 
         print("Preprocess transition probs...")
         self.walker.preprocess_transition_probs()
@@ -79,6 +86,7 @@ if __name__ == "__main__":
     # 加create_using=nx.DiGraph()是有向图，不加是无向图
     G = nx.read_edgelist(os.path.join(args.data_path, 'net.txt'),
                          nodetype=None, data=[('weight', int)])
+
     sku_side_info = np.loadtxt(args.data_path + 'sku_side_info.csv', dtype=np.int32, delimiter='\t')
     item_attr_map = {}
     attr_items_map = {}
@@ -88,8 +96,33 @@ if __name__ == "__main__":
         item_attr_map[str(item)] = str(side_info)
         attr_items_map.setdefault(str(side_info), [])
         attr_items_map[str(side_info)].append(str(item))
-    model = HIGE(G, item_attr_map=item_attr_map, attr_items_map=attr_items_map, walk_length=10, num_walks=80,
-                 p=0.25, q=4, workers=1, use_rejection_sampling=0, use_random_leap=True, r=0.05)
+
+    sku_category = pd.read_csv(args.data_path + 'sku_category.csv', sep="\t", header=None, names=["item", "categories"])
+    category_category_children = pd.read_csv(args.data_path + 'category_category_children.csv', sep="\t", header=None,
+                                             names=["category", "category_children"])
+    category_item_children = pd.read_csv(args.data_path + 'category_item_children.csv', sep="\t", header=None,
+                                         names=["category", "item_children"])
+    item_categories_map = {}
+    for index, row in sku_category.iterrows():
+        item = str(row['item'])
+        categories = [str(s) for s in json.loads(row['categories'])]
+        item_categories_map[item] = categories
+    category_category_children_map = {}
+    for index, row in category_category_children.iterrows():
+        category = str(row['category'])
+        category_children = row['category_children'].split(',')
+        category_category_children_map[category] = category_children
+    category_item_children_map = {}
+    for index, row in category_item_children.iterrows():
+        category = str(row['category'])
+        item_children = row['item_children'].split(',')
+        category_item_children_map[category] = item_children
+
+    model = HIGE(G, item_attr_map=item_attr_map, attr_items_map=attr_items_map, item_categories_map=item_categories_map,
+                 category_category_children_map=category_category_children_map,
+                 category_item_children_map=category_item_children_map, walk_length=10, num_walks=80,
+                 p=0.25, q=4, workers=1, use_rejection_sampling=0, use_random_leap=True, r=0.05, h=0.05, h2=0.05,
+                 use_hierarchical_structure=True)
     model.train(window_size=5, iter=3)
     embeddings=model.get_embeddings()
     output_embeddings(embeddings)

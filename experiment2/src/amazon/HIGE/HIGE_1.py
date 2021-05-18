@@ -10,7 +10,7 @@ from walker import RandomWalker
 class HIGE:
     """1. node2vec hierarchy
        2. node2vec attributes high-order
-       3. cold start
+       3. attention, cold start
     """
     def __init__(self, graph, item_attr_map, attr_items_map, walk_length, num_walks, p=1.0, q=1.0, workers=1,
                  use_rejection_sampling=0, use_random_leap=True, r=0.05):
@@ -79,6 +79,7 @@ if __name__ == "__main__":
     # 加create_using=nx.DiGraph()是有向图，不加是无向图
     G = nx.read_edgelist(os.path.join(args.data_path, 'net.txt'),
                          nodetype=None, data=[('weight', int)])
+
     sku_side_info = np.loadtxt(args.data_path + 'sku_side_info.csv', dtype=np.int32, delimiter='\t')
     item_attr_map = {}
     attr_items_map = {}
@@ -88,6 +89,7 @@ if __name__ == "__main__":
         item_attr_map[str(item)] = str(side_info)
         attr_items_map.setdefault(str(side_info), [])
         attr_items_map[str(side_info)].append(str(item))
+
     model = HIGE(G, item_attr_map=item_attr_map, attr_items_map=attr_items_map, walk_length=10, num_walks=80,
                  p=0.25, q=4, workers=1, use_rejection_sampling=0, use_random_leap=True, r=0.05)
     model.train(window_size=5, iter=3)

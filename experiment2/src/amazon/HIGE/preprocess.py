@@ -31,6 +31,48 @@ def elapsed_timer(message):
     LOGGER.info(message.format(time.time() - start_time))
 
 
+def parse(path):
+    g = gzip.open(path, 'rb')
+    for l in g:
+        yield json.loads(l)
+
+
+def getDF(path):
+    i = 0
+    df = {}
+    for d in parse(path):
+        df[i] = d
+        i += 1
+    return pd.DataFrame.from_dict(df, orient='index')
+
+
+class TrieNode(object):
+    def __init__(self, val, leaf, children, index):
+        self.val, self.leaf, self.children, self.index = val, leaf, children, index
+
+
+class Trie(object):
+    def __init__(self):
+        self.root = TrieNode("", False, {}, -1)
+        self.num_category = 0
+        self.index_category_map = {}
+
+    def insert(self, leaf, path):
+        category_path = []
+
+        node = self.root
+        for category in path:
+            if category not in node.children:
+                node.children[category] = TrieNode(category, False, {}, self.num_category)
+                self.index_category_map[self.num_category] = node.children[category]
+                self.num_category += 1
+            category_path.append(node.children[category].index)
+            node = node.children[category]
+        node.children[leaf] = TrieNode(leaf, True, {}, -1)
+
+        return category_path
+
+
 def preprocess_net(args):
     # with elapsed_timer("-- {0}s - %s" % ("find topk timestamp",)):
     #     q = PriorityQueue()
@@ -151,6 +193,79 @@ def preprocess_net(args):
                 field.write(str(user) + " u\n")
             for item in item_set:
                 field.write(str(item) + " i\n")
+
+    with elapsed_timer("-- {0}s - %s" % ("add side info",)):
+        df = getDF(args.data_path + 'meta_Clothing_Shoes_and_Jewelry_reduced.json.gz')
+        product_data = df.loc[:, ["asin", "brand"]]
+        product_data = product_data.rename(columns={'asin': 'sku_id'})
+
+        # Transform labels back to original encoding.
+        all_skus['sku_id'] = sku_lbe.inverse_transform(all_skus['sku_id'])
+        print("sku nums: " + str(all_skus.count()))
+        sku_side_info = pd.merge(all_skus, product_data, on='sku_id', how='left').fillna("NaN")
+
+        # id2index
+        for feat in sku_side_info.columns:
+            if feat != 'sku_id':
+                lbe = LabelEncoder()
+                sku_side_info[feat] = lbe.fit_transform(sku_side_info[feat])
+            else:
+                sku_side_info[feat] = sku_lbe.transform(sku_side_info[feat])
+
+        sku_side_info = sku_side_info.sort_values(by=['sku_id'], ascending=True)
+        sku_side_info.to_csv('../../../data/amazon/sku_side_info.csv', index=False, header=False, sep='\t')
+
+    with elapsed_timer("-- {0}s - %s" % ("add category",)):
+        product_data = df.loc[:, ["asin", "category"]]
+        product_data = product_data.rename(columns={'asin': 'sku_id'})
+
+        sku_category = pd.merge(all_skus, product_data, on='sku_id', how='left').fillna("NaN")
+
+        sku_category['sku_id'] = sku_lbe.transform(sku_category['sku_id'])
+        sku_category = sku_category.sort_values(by=['sku_id'], ascending=True)
+
+        category_column = []
+        trie = Trie()
+        for index, row in sku_category.iterrows():
+            leaf = row['sku_id']
+            path = row['category']
+            category_column.append(trie.insert(leaf, path))
+        sku_category['category'] = category_column
+        sku_category.to_csv('../../../data/amazon/sku_category.csv', index=False, header=False, sep='\t')
+
+        category_column = [categories[-1] for categories in sku_category["category"].to_list()]
+        sku_side_info["category"] = category_column
+        sku_side_info.to_csv('../../../data/amazon/sku_side_info_category.csv', index=False, header=False, sep='\t')
+
+        category_item_children_map = {}
+        category_category_children_map = {}
+        for i in range(trie.num_category):
+            node = trie.index_category_map[i]
+            item_children = []
+            category_children = []
+            for _, child_node in node.children.items():
+                if child_node.leaf:
+                    item_children.append(child_node.val)
+                else:
+                    category_children.append(child_node.index)
+            if len(item_children) > 0:
+                category_item_children_map[i] = item_children
+            if len(category_children) > 0:
+                category_category_children_map[i] = category_children
+
+        with open("../../../data/amazon/category_category_children.csv", "w") as file:
+            for category, category_children in category_category_children_map.items():
+                file.write(str(category) + "\t" + ",".join([str(category) for category in category_children]) + "\n")
+
+        with open("../../../data/amazon/category_item_children.csv", "w") as file:
+            for category, item_children in category_item_children_map.items():
+                file.write(str(category) + "\t" + ",".join([str(item) for item in item_children]) + "\n")
+
+        with open("../../../data/amazon/category_side_info.csv", "w", encoding="utf-8") as file:
+            for i in range(trie.num_category):
+                node = trie.index_category_map[i]
+                # file.write(str(i) + "\t" + node.val + "\n")
+                file.write(str(i) + "\n")
 
 
 if __name__ == '__main__':

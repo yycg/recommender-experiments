@@ -12,8 +12,10 @@ from utils import partition_num
 
 
 class RandomWalker:
-    def __init__(self, G, item_attr_map, attr_items_map, p=1, q=1, use_rejection_sampling=0,
-                 use_random_leap=True, r=0.05):
+    def __init__(self, G, p=1, q=1, use_rejection_sampling=0,
+                 use_random_leap=True, item_attr_map=None, attr_items_map=None, r=0.05,
+                 use_hierarchical_structure=False, item_categories_map=None, category_category_children_map=None,
+                 category_item_children_map=None, h=0.05, h2=0.05):
         """
         :param G:
         :param p: Return parameter,controls the likelihood of immediately revisiting a node in the walk.
@@ -28,6 +30,12 @@ class RandomWalker:
         self.item_attr_map = item_attr_map
         self.attr_items_map = attr_items_map
         self.r = r
+        self.h = h
+        self.h2 = h2
+        self.use_hierarchical_structure = use_hierarchical_structure
+        self.item_categories_map = item_categories_map
+        self.category_category_children_map = category_category_children_map
+        self.category_item_children_map = category_item_children_map
 
     def deepwalk_walk(self, walk_length, start_node):
 
@@ -84,6 +92,78 @@ class RandomWalker:
                 break
 
         return walk
+
+    def hierarchical_random_leap(self, walk_length, start_node):
+
+        G = self.G
+        alias_nodes = self.alias_nodes
+        alias_edges = self.alias_edges
+
+        walk = [start_node]
+        prev = None
+        cur = walk[0]
+
+        while len(walk) < walk_length:
+            # walk to user/item node
+            cur_nbrs = list(G.neighbors(cur))
+            if len(cur_nbrs) > 0:
+                if prev is None:
+                    walk.append(
+                        cur_nbrs[alias_sample(alias_nodes[cur][0], alias_nodes[cur][1])])
+                else:
+                    edge = (prev, cur)
+                    next_node = cur_nbrs[alias_sample(alias_edges[edge][0],
+                                                      alias_edges[edge][1])]
+                    walk.append(next_node)
+
+                prev = cur
+                cur = walk[-1]
+
+                # leap to item attribute
+                if cur in self.item_attr_map and random.random() < self.r:
+                    brand = self.item_attr_map[cur]
+                    walk.append('brand' + brand)
+                    while True:
+                        item = random.choice(self.attr_items_map[brand])
+                        if self.G.has_node(item):
+                            walk.append(item)
+                            break
+
+                    prev = None
+                    cur = walk[-1]
+
+                # leap to category
+                if cur in self.item_categories_map and random.random() < self.h:
+                    cur_walk = []
+                    while len(cur_walk) == 0 or not self.G.has_node(cur_walk[-1]):
+                        # walk up
+                        categories = self.item_categories_map[cur][::-1]  # reverse
+                        cur_walk.append('category' + categories[0])
+                        for i in range(1, len(categories)):
+                            if random.random() < self.h2:
+                                cur_walk.append('category' + categories[i])
+                            else:
+                                break
+
+                        # walk down
+                        self.try_walking_down(cur_walk)
+
+                    walk += cur_walk
+                    prev = None
+                    cur = walk[-1]
+            else:
+                break
+
+        return walk
+
+    def try_walking_down(self, walk):
+        while True:
+            category = walk[-1][8:]
+            if category in self.category_item_children_map:
+                walk.append(random.choice(self.category_item_children_map[category]))
+                return
+            elif category in self.category_category_children_map:
+                walk.append('category' + random.choice(self.category_category_children_map[category]))
 
     def node2vec_walk(self, walk_length, start_node):
 
@@ -186,8 +266,11 @@ class RandomWalker:
                 if self.p == 1 and self.q == 1:
                     walks.append(self.deepwalk_walk(
                         walk_length=walk_length, start_node=v))
-                elif self.use_random_leap:
+                elif self.use_random_leap and not self.use_hierarchical_structure:
                     walks.append(self.random_leap(
+                        walk_length=walk_length, start_node=v))
+                elif self.use_random_leap and self.use_hierarchical_structure:
+                    walks.append(self.hierarchical_random_leap(
                         walk_length=walk_length, start_node=v))
                 elif self.use_rejection_sampling:
                     walks.append(self.node2vec_walk2(
