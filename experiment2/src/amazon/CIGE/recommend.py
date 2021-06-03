@@ -24,7 +24,7 @@ def recommend(data_path, user_set, cand_set):
     wv_user = KeyedVectors.load_word2vec_format(os.path.join(data_path, "embedding", "IGE_user.embed"), binary=False)
     wv_item = KeyedVectors.load_word2vec_format(os.path.join(data_path, "embedding", "IGE_item.embed"), binary=False)
 
-    with open(os.path.join(data_path, "IGE.tsv"), "w") as recommend:
+    with open(os.path.join(data_path, "CIGE_user.tsv"), "w") as recommend:
         for user in user_set:
             item_score_list = []
             for item in cand_set:
@@ -39,7 +39,7 @@ def recommend(data_path, user_set, cand_set):
                     [str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
 
 
-def recommend2(data_path, user_set, cand_set):
+def recommend_item(data_path, user_set, cand_set):
     user_items_train_map = {}
     with open(os.path.join(data_path, 'train.tsv'), 'r') as train:
         for line in train:
@@ -50,9 +50,77 @@ def recommend2(data_path, user_set, cand_set):
             user_items_train_map[user].append(item)
 
     # load word vectors file
-    wv = KeyedVectors.load_word2vec_format(os.path.join(data_path, "embedding", "IGE_item.embed"), binary=False)
+    wv = KeyedVectors.load_word2vec_format(os.path.join(data_path, "embedding", "IGE_item4.embed"), binary=False)
 
-    with open(os.path.join(data_path, "IGE.tsv"), "w") as recommend:
+    with open(os.path.join(data_path, "CIGE.tsv"), "w") as recommend:
+        for user in user_set:
+            item_score_list = []
+            for cand in cand_set:
+                score = sum([wv.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
+                    if str(cand) in wv else 0
+                item_score_list.append((cand, score))
+            item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
+
+            recommend.write(str(user) + "\t")
+            recommend.write(
+                ",".join(
+                    [str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
+
+
+def recommend_item_cold_start(data_path, user_set, cand_set):
+    user_items_train_map = {}
+    item_set = set()
+    with open(os.path.join(data_path, 'train.tsv'), 'r') as train:
+        for line in train:
+            columns = line.strip().split('\t')
+            user = columns[0]
+            item = columns[1]
+            user_items_train_map.setdefault(user, [])
+            user_items_train_map[user].append(item)
+            item_set.add(item)
+
+    sku_side_info = np.loadtxt(os.path.join(data_path, 'sku_side_info.csv'), dtype=np.int32, delimiter='\t')
+
+    # load word vectors file
+    wv = KeyedVectors.load_word2vec_format(os.path.join(data_path, "embedding", "IGE_item4.embed"), binary=False)
+    wv_attr = KeyedVectors.load_word2vec_format(os.path.join(data_path, "embedding", "IGE_attr4.embed"), binary=False)
+
+    with open(os.path.join(data_path, "CIGE_Cold.tsv"), "w") as recommend:
+        for user in user_set:
+            item_score_list = []
+            for cand in cand_set:
+                if cand in item_set:
+                    score = sum([wv.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
+                        if str(cand) in wv else 0
+                else:
+                    attr = sku_side_info[int(cand)][1]
+                    score = 1 * sum([dot(matutils.unitvec(wv_attr[str(attr)]), matutils.unitvec(wv[str(item)]))
+                                 for item in user_items_train_map[user]]) + \
+                            0.2 * sum([wv.similarity(str(cand), str(item)) for item in user_items_train_map[user]]) \
+                                if str(cand) in wv else 0
+                item_score_list.append((cand, score))
+            item_score_list.sort(key=lambda item_score: item_score[1], reverse=True)
+
+            recommend.write(str(user) + "\t")
+            recommend.write(
+                ",".join(
+                    [str(item_score[0]) + ":" + str(item_score[1]) for item_score in item_score_list[:100]]) + "\n")
+
+
+def recommend_HIGE_item(data_path, user_set, cand_set):
+    user_items_train_map = {}
+    with open(os.path.join(data_path, 'train.tsv'), 'r') as train:
+        for line in train:
+            columns = line.strip().split('\t')
+            user = columns[0]
+            item = columns[1]
+            user_items_train_map.setdefault(user, [])
+            user_items_train_map[user].append(item)
+
+    # load word vectors file
+    wv = KeyedVectors.load_word2vec_format(os.path.join(data_path, "embedding", "HIGE_item.embed"), binary=False)
+
+    with open(os.path.join(data_path, "HIGE.tsv"), "w") as recommend:
         for user in user_set:
             item_score_list = []
             for cand in cand_set:
@@ -71,4 +139,6 @@ if __name__ == "__main__":
     data_path = "../../../data/amazon"
     user_set, cand_set = get_user_cand_set(data_path)
     # recommend(data_path, user_set, cand_set)
-    recommend2(data_path, user_set, cand_set)
+    # recommend_item(data_path, user_set, cand_set)
+    # recommend_item_cold_start(data_path, user_set, cand_set)
+    recommend_HIGE_item(data_path, user_set, cand_set)

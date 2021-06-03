@@ -107,6 +107,12 @@ if __name__ == '__main__':
         # Transform labels to normalized encoding.
         action_data['sku_id'] = sku_lbe.transform(action_data['sku_id'])
 
+        # index = 0
+        # with open("../../../data/amazon/user_map.csv", "w") as file:
+        #     for user in list(action_data['user_id'].unique()):
+        #         file.write(str(user) + "\t" + str(index) + "\n")
+        #         index += 1
+
         all_users = pd.DataFrame({'user_id': list(action_data['user_id'].unique())})
         user_lable = LabelEncoder()
         user_lable.fit(all_users['user_id'])

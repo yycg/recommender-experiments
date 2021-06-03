@@ -66,7 +66,7 @@ class HIGE:
 
 
 def output_embeddings(embeddings):
-    with open("../../../data/amazon/embedding/node2vec.embed", "w") as file:
+    with open("../../../data/amazon/embedding/node2vec11.embed", "w") as file:
         num_nodes = len(embeddings)
         for node, emb in embeddings.items():
             embedding_size = len(emb)
@@ -120,9 +120,9 @@ if __name__ == "__main__":
 
     model = HIGE(G, item_attr_map=item_attr_map, attr_items_map=attr_items_map, item_categories_map=item_categories_map,
                  category_category_children_map=category_category_children_map,
-                 category_item_children_map=category_item_children_map, walk_length=10, num_walks=80,
-                 p=0.25, q=4, workers=1, use_rejection_sampling=0, use_random_leap=True, r=0.05, h=0.05, h2=0.05,
+                 category_item_children_map=category_item_children_map, walk_length=10, num_walks=100,
+                 p=0.25, q=4, workers=2, use_rejection_sampling=0, use_random_leap=True, r=0.05, h=0.5, h2=0.1,
                  use_hierarchical_structure=True)
-    model.train(window_size=5, iter=3)
+    model.train(window_size=5, iter=5)
     embeddings=model.get_embeddings()
     output_embeddings(embeddings)
